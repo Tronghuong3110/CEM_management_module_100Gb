@@ -1,0 +1,67 @@
+/* ===== Kích thước & font đồng bộ ===== */
+.text-field,
+.custom-combobox,
+.custom-combobox .list-cell {
+    -fx-font-size: 14px;
+    -fx-pref-height: 36px;
+    -fx-min-height: 36px;
+}
+
+/* ===== TextField (để cao y hệt ComboBox) ===== */
+.text-field {
+    -fx-background-color: white;
+    -fx-border-color: #c0e0eb;
+    -fx-border-width: 1px;
+    -fx-border-radius: 5px;
+    -fx-background-radius: 5px;
+    -fx-background-insets: 0;
+}
+
+/* ===== Style chung cho ComboBox ===== */
+.custom-combobox {
+    -fx-background-color: white;
+    -fx-border-color: #c0e0eb;
+    -fx-border-width: 1px;
+    -fx-border-radius: 5px;
+    -fx-background-radius: 5px;
+    -fx-background-insets: 0;
+
+    -fx-focus-color: #3a8fb7;
+    -fx-faint-focus-color: transparent;
+}
+
+.custom-combobox .text-field {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-border-color: transparent;
+    -fx-focus-color: transparent;
+    -fx-faint-focus-color: transparent;
+    /*-fx-padding: 0 10px;*/
+    -fx-pref-height: 34px;
+    -fx-min-height: 34px;
+}
+
+.custom-combobox .arrow-button {
+    -fx-background-color: transparent;
+    -fx-background-insets: 0;
+    -fx-border-radius: 0 5px 5px 0;
+    -fx-background-radius: 0 5px 5px 0;
+}
+
+.custom-combobox .arrow {
+    -fx-background-color: #3a8fb7;
+}
+
+.custom-combobox .list-view {
+    -fx-cell-size: 32px;
+}
+
+.custom-combobox:hover,
+.text-field:hover {
+    -fx-border-color: #8ccfe5;
+}
+
+.custom-combobox:focused,
+.text-field:focused {
+    -fx-border-color: #3a8fb7;
+}

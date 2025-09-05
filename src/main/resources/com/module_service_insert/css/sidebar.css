@@ -1,0 +1,84 @@
+/* Sidebar */
+.sidebar {
+    -fx-background-color: linear-gradient(to bottom, #0d1c2b, #152a3d 65%, #132437);
+    -fx-padding: 18 12;
+}
+
+/* Logo */
+.logo-box {
+    -fx-alignment: center-left;
+    -fx-padding: 8 8 18 8;
+}
+.sidebar-logo {
+    -fx-text-fill: #eaf2ff;
+    -fx-font-size: 28px;
+    -fx-font-weight: 700;
+    -fx-opacity: .95;
+}
+
+/* Menu container */
+.menu-box {
+    -fx-padding: 6 0;
+    -fx-spacing: 6;
+}
+
+/* ITEM cơ bản */
+.menu-item {
+    -fx-padding: 10 12 10 16;
+    -fx-background-color: transparent;
+    -fx-alignment: CENTER_LEFT;
+    -fx-cursor: hand;
+
+    -fx-focus-color: transparent;
+    -fx-faint-focus-color: transparent;
+}
+
+/* Icon + text */
+.menu-icon { -fx-opacity: .85; }
+.menu-label {
+    -fx-text-fill: #cbd6e2;
+    -fx-font-size: 16px;
+    -fx-wrap-text: false;
+}
+
+/* Hover (khi KHÔNG active) */
+.menu-item:hover {
+    -fx-background-color: rgba(255,255,255,0.06);
+}
+
+/* Khi nhấn giữ */
+.menu-item:armed {
+    -fx-background-color: rgba(255,255,255,0.10);
+}
+
+/* === ACTIVE: nền xám nhạt + border trái 2px trắng === */
+.menu-item.active {
+    -fx-background-color: rgba(255,255,255,0.1);
+    -fx-border-color: white;
+    -fx-border-width: 0 0 0 2;    /* border trái 2px */
+    -fx-border-insets: 0;
+}
+
+.menu-item.active:hover {
+    -fx-background-color: rgba(255,255,255,0.10);
+    -fx-border-color: white;
+    -fx-border-width: 0 0 0 2;
+}
+
+/* Text/icon khi active */
+.menu-item.active .menu-label {
+    -fx-text-fill: #ffffff;
+    -fx-font-weight: 600;
+}
+.menu-item.active .menu-icon { -fx-opacity: 1; }
+
+/* Footer / logout */
+.sidebar-footer {
+    -fx-padding: 24 8 12 8;
+    -fx-alignment: center-left;
+}
+.logout {
+    -fx-text-fill: #9fb3c8;
+    -fx-font-size: 12.5px;
+}
+.logout:hover { -fx-text-fill: #d2e3ff; }
