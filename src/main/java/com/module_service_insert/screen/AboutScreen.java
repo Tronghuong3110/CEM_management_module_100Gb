@@ -24,6 +24,8 @@ import java.io.InputStreamReader;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.Objects;
 
 /**
@@ -207,12 +209,21 @@ public class AboutScreen extends VBox {
 
     public void checkStatusLicense(String licensePath) {
         if(licensePath == null || licensePath.isBlank()) {
-            return;
+            String folderLicense = "D:\\license\\";
+            File folder = new File(folderLicense);
+            File[] filesLicense = folder.listFiles((dir, filename) -> filename.endsWith(".txt"));
+            if(filesLicense != null && filesLicense.length > 0) {
+                File newest = Arrays.stream(filesLicense)
+                        .max(Comparator.comparingLong(File::lastModified))
+                        .orElse(null);
+                licensePath = newest.getPath();
+                System.out.println(licensePath);
+            }
         }
         locationVal.setText(licensePath);
         try {
             String moduleCheckLicense = "D:\\license\\check_license.py";
-            String command = "python -u  " + moduleCheckLicense;
+            String command = "python -u  " + moduleCheckLicense  + " " + licensePath;
             Process processCheckLicense = Runtime.getRuntime().exec(command);
             BufferedReader output = new BufferedReader(new InputStreamReader(processCheckLicense.getInputStream()));
             String line;
