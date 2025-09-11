@@ -10,6 +10,7 @@ module com.manager.stock.module_service_insert {
     requires org.slf4j;
     requires apache.any23.encoding;
     requires org.json;
+    requires poi.scratchpad;
 
     opens com.module_service_insert to javafx.fxml;
     exports com.module_service_insert;

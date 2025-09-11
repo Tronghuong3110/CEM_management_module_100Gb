@@ -63,7 +63,7 @@ public class ScreenNavigator {
         menuBox.setFillWidth(true);
 
         List<HBox> items = new ArrayList<>();
-        items.add(createSidebarItem("Cấu hình chung", 26, 26, "/com/module_service_insert/icons/config.png", () -> {
+        items.add(createSidebarItem("General Config", 26, 26, "/com/module_service_insert/icons/config.png", () -> {
             ScreenNavigator.showLoading();
             Platform.runLater(() -> {
                 ConfigGeneralScreen s = new ConfigGeneralScreen();
@@ -71,7 +71,7 @@ public class ScreenNavigator {
                 ScreenNavigator.navigateTo(s);
             });
         }));
-        items.add(createSidebarItem("Thiết lập chạy", 26, 26, "/com/module_service_insert/icons/play.png", () -> {
+        items.add(createSidebarItem("Run Config", 26, 26, "/com/module_service_insert/icons/play_menu.png", () -> {
             ScreenNavigator.showLoading();
             Platform.runLater(() -> {
                 ConfigRunModuleScreen s = new ConfigRunModuleScreen(null);
@@ -79,20 +79,12 @@ public class ScreenNavigator {
                 ScreenNavigator.navigateTo(s);
             });
         }));
-        items.add(createSidebarItem("Bản quyền", 26, 26, "/com/module_service_insert/icons/license.png", () -> {
+        items.add(createSidebarItem("About", 30, 30, "/com/module_service_insert/icons/about.png", () -> {
             ScreenNavigator.showLoading();
             Platform.runLater(() -> {
-                ModuleScreen s = new ModuleScreen();
-                s.showTable();
-                ScreenNavigator.navigateTo(s);
-            });
-        }));
-        items.add(createSidebarItem("Thông tin", 30, 30, "/com/module_service_insert/icons/about.png", () -> {
-            ScreenNavigator.showLoading();
-            Platform.runLater(() -> {
-                ModuleScreen s = new ModuleScreen();
-                s.showTable();
-                ScreenNavigator.navigateTo(s);
+                AboutScreen about = new AboutScreen();
+                about.checkStatusLicense(null);
+                ScreenNavigator.navigateTo(about);
             });
         }));
         menuBox.getChildren().addAll(items);

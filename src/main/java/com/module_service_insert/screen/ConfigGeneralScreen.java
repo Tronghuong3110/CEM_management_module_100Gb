@@ -219,8 +219,8 @@ public class ConfigGeneralScreen extends VBox {
                     File file = ChooseLocationFile.choosesFolderFile("config");
                     if(file == null) return;
                     String outputPath = file.getAbsolutePath();
+                    // gọi hàm tạo file json
                     convertJson(Paths.get(outputPath));
-                    // gọi hàm tạo file xlsx
                     AlertUtils.showAlert("Thành công", "Xuất file thành công:\n" + file.getAbsolutePath(),
                             "INFORMATION");
                 } catch (Exception e) {

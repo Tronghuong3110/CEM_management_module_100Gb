@@ -15,6 +15,18 @@ public class ConfigRunModuleTableData {
     private final StringProperty command = new SimpleStringProperty();
     private final StringProperty interfaceName = new SimpleStringProperty();
     private final StringProperty clusterName = new SimpleStringProperty();
+    private ArgumentsTableData argumentsTableData;
+
+    public ConfigRunModuleTableData() {
+        argumentsTableData = new ArgumentsTableData();
+    }
+
+    public ConfigRunModuleTableData(String moduleName, String status, String command, String interfaceName, String clusterName) {
+        this.moduleName.setValue(moduleName);
+        this.status.setValue(status);
+        this.command.setValue(command);
+        this.interfaceName.setValue(interfaceName);
+    }
 
     public StringProperty moduleNameProperty() {return moduleName;}
     public StringProperty statusProperty() {return status;}
@@ -28,4 +40,12 @@ public class ConfigRunModuleTableData {
     public Boolean isSelected() {return selected.get();}
     public String getModuleName() {return this.moduleName.get();}
     public String getStatus() {return this.status.get();}
+    public String getInterfaceName() {return this.interfaceName.get();}
+    public String getClusterName() {return this.clusterName.get();}
+    public String getCommand() {return this.command.get();}
+
+    public void setArgs(ArgumentsTableData argumentsTableData) {
+        this.argumentsTableData = argumentsTableData;
+    }
+    public ArgumentsTableData getArgs() {return this.argumentsTableData;}
 }

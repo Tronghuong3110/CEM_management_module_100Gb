@@ -62,12 +62,18 @@ public class CreateTopBarUtil {
         Image reloadIcon = new Image(CreateTopBarUtil.class.getResource("/com/module_service_insert/icons/reload.png").toExternalForm());
         Image loadConfigIcon = new Image(CreateTopBarUtil.class.getResource("/com/module_service_insert/icons/import.png").toExternalForm());
         Image exportIcon = new Image(CreateTopBarUtil.class.getResource("/com/module_service_insert/icons/export.png").toExternalForm());
+        Image addNewIcon = new Image(CreateTopBarUtil.class.getResource("/com/module_service_insert/icons/add.png").toExternalForm());
+        Image editIcon = new Image(CreateTopBarUtil.class.getResource("/com/module_service_insert/icons/pencil.png").toExternalForm());
 
         Button btnImport = new Button("Import Config", new ImageView(loadConfigIcon));
         Button btnReload = new Button("Refresh", new ImageView(reloadIcon));
         Button btnExport = new Button("Export Config", new ImageView(exportIcon));
+        Button btnAddNew = new Button("Add new", new ImageView(addNewIcon));
+        Button btnEdit = new Button("Edit", new ImageView(editIcon));
 
         Map<Button, Runnable> buttonActions = Map.of (
+                btnAddNew, handler::onAdd,
+                btnEdit, handler::onEdit,
                 btnImport, handler::onImport,
                 btnReload, handler::onReload,
                 btnExport, handler::onExport
@@ -84,7 +90,7 @@ public class CreateTopBarUtil {
         }
 
         // HBox for the top bar
-        HBox topBar = new HBox(10, btnReload, btnImport, btnExport);
+        HBox topBar = new HBox(10, btnAddNew, btnReload, btnImport, btnExport);
         topBar.setAlignment(Pos.CENTER_LEFT);
         topBar.setPadding(new Insets(5));
 

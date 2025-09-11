@@ -25,11 +25,11 @@ public class ModuleInsertApplication extends Application {
             ScreenNavigator.navigateTo(managerNodeAndModuleScreen);
         });
 
-        Scene scene = new Scene(root, 1000, 800);
+        Scene scene = new Scene(root, 1000, 750);
         stage.setTitle("Ứng dụng quản lý module");
         stage.setScene(scene);
+        stage.setResizable(false);
         stage.show();
-
 
         stage.setOnCloseRequest(e -> {
             System.out.println("Closing application");
