@@ -1,7 +1,9 @@
 package com.module_service_insert.screen;
 
+import com.module_service_insert.utils.functionUtils.AlertUtils;
 import com.module_service_insert.utils.screenUtils.CreateLoadingUtil;
 import javafx.application.Platform;
+import javafx.concurrent.Task;
 import javafx.geometry.Pos;
 import javafx.scene.Cursor;
 import javafx.scene.Node;
@@ -9,6 +11,7 @@ import javafx.scene.control.*;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.*;
+import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -81,11 +84,27 @@ public class ScreenNavigator {
         }));
         items.add(createSidebarItem("About", 30, 30, "/com/module_service_insert/icons/about.png", () -> {
             ScreenNavigator.showLoading();
-            Platform.runLater(() -> {
-                AboutScreen about = new AboutScreen();
-                about.checkStatusLicense(null);
-                ScreenNavigator.navigateTo(about);
+            AboutScreen about = new AboutScreen();
+            Task<JSONObject> task = new Task<JSONObject>() {
+                @Override
+                protected JSONObject call() throws Exception {
+                    return about.checkStatusLicense(null);
+                }
+            };
+
+            task.setOnSucceeded(event -> {
+                JSONObject result = task.getValue();
+                about.setValue(result);
+                Platform.runLater(() -> {
+                    ScreenNavigator.navigateTo(about);
+                });
             });
+            task.setOnFailed(event -> {
+                Throwable ex = task.getException();
+                ex.printStackTrace();
+                AlertUtils.showAlert("Lỗi", "Có lỗi xảy ra khi kiểm tra license", "ERROR");
+            });
+            new Thread(task).start();
         }));
         menuBox.getChildren().addAll(items);
 
