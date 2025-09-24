@@ -1,5 +1,6 @@
 package com.module_service_insert.screen;
 
+import com.module_service_insert.constant.VariableCommon;
 import com.module_service_insert.utils.functionUtils.AlertUtils;
 import com.module_service_insert.utils.screenUtils.AddCssForBtnUtil;
 import javafx.application.Platform;
@@ -7,6 +8,7 @@ import javafx.concurrent.Task;
 import javafx.geometry.HPos;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.geometry.VPos;
 import javafx.scene.control.Button;
 import javafx.scene.control.ContentDisplay;
 import javafx.scene.control.Label;
@@ -42,7 +44,7 @@ public class AboutScreen extends StackPane {
     private VBox container;
     private StackPane overLay;
 
-    private Label statusVal, typeVal, userVal, locationVal, expiryVal, statusLabel;
+    private Label statusVal, failureCauseVal, licenseNameVal, locationVal, expiryVal, statusLabel;
 
     public AboutScreen() {
         container = new VBox(10);
@@ -90,33 +92,33 @@ public class AboutScreen extends StackPane {
 
         // Tiêu đề
         Label title = new Label("Thông tin License");
-        title.setStyle("-fx-font-size: 22px; -fx-font-weight: bold;");
+        title.setStyle("-fx-font-size: 24px; -fx-font-weight: bold;");
 
         // Labels với icon
         statusVal  = new Label("Chưa kích hoạt");
-        typeVal     = new Label("N/A");
-        userVal     = new Label("N/A");
+        failureCauseVal     = new Label("N/A");
+        licenseNameVal     = new Label("N/A");
         locationVal = new Label("N/A");
         expiryVal   = new Label("N/A");
 
         statusLabel   = createLabelWithIcon("Trạng thái", "/com/module_service_insert/icons/status_fail.png");
-        Label typeLabel     = createLabelWithIcon("Loại license", "/com/module_service_insert/icons/type.png");
-        Label userLabel     = createLabelWithIcon("Đơn vị sử dụng", "/com/module_service_insert/icons/user_use.png");
+        Label failureCauseLabel     = createLabelWithIcon("Mã lỗi", "/com/module_service_insert/icons/type.png");
+        Label licenseNameLabel     = createLabelWithIcon("Tên license", "/com/module_service_insert/icons/user_use.png");
         Label locationLabel = createLabelWithIcon("Vị trí license", "/com/module_service_insert/icons/folder.png");
-        Label expiryLabel   = createLabelWithIcon("Ngày hết hạn", "/com/module_service_insert/icons/expiry.png");
+        Label expiryLabel   = createLabelWithIcon("Thời gian license", "/com/module_service_insert/icons/expiry.png");
 
-        String valueStyle = "-fx-font-size: 16px;";
+        String valueStyle = "-fx-font-size: 18px;";
         statusVal.setStyle("-fx-text-fill: #f41717;" + valueStyle);
-        typeVal.setStyle(valueStyle);
-        userVal.setStyle(valueStyle);
+        failureCauseVal.setStyle(valueStyle);
+        licenseNameVal.setStyle(valueStyle);
         locationVal.setStyle(valueStyle);
         expiryVal.setStyle(valueStyle);
 
         grid.add(title, 0, 0, 2, 1);
         GridPane.setHalignment(title, HPos.CENTER);
         grid.addRow(1, statusLabel, statusVal);
-        grid.addRow(2, typeLabel, typeVal);
-        grid.addRow(3, userLabel, userVal);
+        grid.addRow(2, failureCauseLabel, failureCauseVal);
+        grid.addRow(3, licenseNameLabel, licenseNameVal);
         grid.addRow(4, locationLabel, locationVal);
         grid.addRow(5, expiryLabel, expiryVal);
 
@@ -145,13 +147,22 @@ public class AboutScreen extends StackPane {
         Button btnImport = new Button("Load license", importIcon);
         AddCssForBtnUtil.addCssStyleForBtn(btnCheck);
         AddCssForBtnUtil.addCssStyleForBtn(btnImport);
+        btnCheck.setMinWidth(Region.USE_PREF_SIZE);
+        btnImport.setMinWidth(Region.USE_PREF_SIZE);
+        btnCheck.setMaxWidth(Region.USE_PREF_SIZE);
+        btnImport.setMaxWidth(Region.USE_PREF_SIZE);
 
-        HBox buttonBox = new HBox(10, btnImport, btnCheck);
-        buttonBox.setAlignment(Pos.CENTER_RIGHT);
-        buttonBox.setPadding(new Insets(0, 30, 0, 0));
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
+
+        HBox buttonBox = new HBox(10, spacer, btnCheck, btnImport);
+//        buttonBox.setStyle("-fx-border-width: 1; -fx-border-color: #000000");
+        buttonBox.setMaxWidth(Region.USE_PREF_SIZE);
+        buttonBox.setMinWidth(Region.USE_PREF_SIZE);
 
         grid.add(buttonBox, 0, 6, 2, 1);
         GridPane.setHalignment(buttonBox, HPos.RIGHT);
+        GridPane.setValignment(buttonBox, VPos.BOTTOM);
 
         btnCheck.setOnMouseClicked(event -> {
             overLay.setVisible(true);
@@ -186,7 +197,7 @@ public class AboutScreen extends StackPane {
             FileChooser fileChooser = new FileChooser();
             fileChooser.setTitle("Load license");
             fileChooser.setSelectedExtensionFilter(
-                    new FileChooser.ExtensionFilter("Txt", "*.txt")
+                    new FileChooser.ExtensionFilter("Lic", "*.lic")
             );
             Window owner = null;
             for(Window w : Window.getWindows()) {
@@ -199,7 +210,7 @@ public class AboutScreen extends StackPane {
             File chooseFile = fileChooser.showOpenDialog(owner);
             if(chooseFile != null) {
                 DateTimeFormatter dtf = DateTimeFormatter.ofPattern("dd_MM_yyyy_HH_mm_ss");
-                String destPath = "D:\\license\\" + chooseFile.getName().split("\\.")[0] + dtf.format(LocalDateTime.now()) + ".txt";
+                String destPath = VariableCommon.LICENSE_CHECK_MODULE_PATH + "/" + chooseFile.getName().split("\\.")[0] + "_" + dtf.format(LocalDateTime.now()) + ".lic";
                 try {
                     Files.copy(chooseFile.toPath(), Paths.get(destPath), StandardCopyOption.REPLACE_EXISTING);
                 } catch (IOException e) {
@@ -233,7 +244,7 @@ public class AboutScreen extends StackPane {
         grid.setHgap(20);
         grid.setVgap(15);
         grid.setPadding(new Insets(40, 0, 0, 0));
-        String fontText = "-fx-font-size: 16px;";
+        String fontText = "-fx-font-size: 18px;";
         Label version = new Label("Version: 1.0.0.20251009");
         Label releaseDate = new Label("Release Date: September 10, 2025");
         Label copyRight = new Label("Copyright © 2010-2025 Newlife Tech. All rights reserved.");
@@ -241,7 +252,7 @@ public class AboutScreen extends StackPane {
         releaseDate.setStyle(fontText);
         copyRight.setStyle(fontText);
 
-        String valueStyle = "-fx-font-size: 16px;";
+        String valueStyle = "-fx-font-size: 18px;";
         version.setStyle(valueStyle);
         releaseDate.setStyle(valueStyle);
         copyRight.setStyle(valueStyle);
@@ -267,46 +278,54 @@ public class AboutScreen extends StackPane {
 
     public JSONObject checkStatusLicense(String licensePath) {
         if(licensePath == null || licensePath.isBlank()) {
-            String folderLicense = "D:\\license\\";
+            String folderLicense = VariableCommon.LICENSE_CHECK_MODULE_PATH;
             File folder = new File(folderLicense);
-            File[] filesLicense = folder.listFiles((dir, filename) -> filename.endsWith(".txt"));
+            File[] filesLicense = folder.listFiles((dir, filename) -> filename.endsWith(".lic"));
+//            File[] filesLicense = folder.listFiles((dir, filename) -> filename.endsWith(".txt"));
             if(filesLicense != null && filesLicense.length > 0) {
                 File newest = Arrays.stream(filesLicense)
                         .max(Comparator.comparingLong(File::lastModified))
                         .orElse(null);
                 licensePath = newest.getPath();
-                System.out.println(licensePath);
             }
         }
         try {
-            String moduleCheckLicense = "D:\\license\\check_license.py";
-            String command = "python -u  " + moduleCheckLicense  + " " + licensePath;
+            String command = VariableCommon.LICENSE_CHECK_MODULE_NAME;
             Process processCheckLicense = Runtime.getRuntime().exec(command);
             BufferedReader output = new BufferedReader(new InputStreamReader(processCheckLicense.getInputStream()));
             String line;
             JSONObject response = new JSONObject();
-            response.put("location", licensePath);
+            System.out.println(licensePath);
+            response.put("location", licensePath == null ? "N/A" : licensePath);
+            response.put("failure_cause", "N/A");
+            response.put("license_time", "N/A");
+            response.put("license_name", "N/A");
+            System.out.println(response);
+            boolean isLicenseError = false;
             while ((line = output.readLine()) != null) {
-                if(line.startsWith("status")) {
-                    boolean isCheckLicense = line.split("=")[1].toLowerCase().contains("success");
-                    response.put("status", isCheckLicense ? "Đã kích hoạt" : "Chưa kích hoạt");
-                    if(isCheckLicense) {
+                if(line.startsWith("License validation")) {
+                    isLicenseError = line.toLowerCase().contains("failed");
+                    System.out.println(line);
+                    response.put("status", !isLicenseError ? "Đã kích hoạt" : "Chưa kích hoạt");
+                    if(!isLicenseError) {
                         response.put("icon", "/com/module_service_insert/icons/status_success.png");
-                        response.put("style", "-fx-text-fill: #08c608; -fx-font-size: 16px;");
+                        response.put("style", "-fx-text-fill: #08c608; -fx-font-size: 18px;");
                     }
                     else {
                         response.put("icon", "/com/module_service_insert/icons/status_fail.png");
-                        response.put("style", "-fx-text-fill: #f41717; -fx-font-size: 16px;");
+                        response.put("style", "-fx-text-fill: #f41717; -fx-font-size: 18px;");
                     }
                 }
-                else if(line.startsWith("type")) {
-                    response.put("type", line.split("=")[1].toLowerCase());
+                if(line.startsWith("License name")) {
+                    response.put("license_name", line.split(": ")[1]);
+                    continue;
                 }
-                else if(line.startsWith("organization")) {
-                    response.put("organization", line.split("=")[1].toLowerCase());
+                if(line.startsWith("License time")) {
+                    response.put("license_time", line.split(": ")[1]);
+                    continue;
                 }
-                else if(line.startsWith("expiry")) {
-                    response.put("expiry", line.split("=")[1].toLowerCase());
+                if(line.startsWith("Failure cause")) {
+                    response.put("failure_cause", line.split(": ")[1]);
                 }
             }
             return response;
@@ -323,7 +342,7 @@ public class AboutScreen extends StackPane {
         icon.setFitHeight(24);
 
         Label label = new Label(text, icon);
-        label.setFont(Font.font(16));
+        label.setFont(Font.font(18));
         label.setContentDisplay(ContentDisplay.LEFT);
         label.setStyle("-fx-font-weight: bold;");
         label.setGraphicTextGap(15);
@@ -331,24 +350,22 @@ public class AboutScreen extends StackPane {
     }
 
     public void setValue(JSONObject jsonObject) {
-//        Platform.runLater(() -> {
-           String status = jsonObject.getString("status");
-           String type = jsonObject.getString("type");
-           String organization = jsonObject.getString("organization");
-           String expiry = jsonObject.getString("expiry");
-           String style = jsonObject.getString("style");
-           String icon = jsonObject.getString("icon");
-           String locationPath = jsonObject.getString("location");
+       String status = jsonObject.get("status") != null ? jsonObject.get("status").toString() : "N/A";
+       String failureCause = jsonObject.get("failure_cause") != null ?  jsonObject.get("failure_cause").toString() : "N/A";
+       String licenseName = jsonObject.get("license_name") != null ? jsonObject.getString("license_name") : "N/A";
+       String expiry = jsonObject.get("license_time") != null ? jsonObject.getString("license_time") : "N/A";
+       String style = jsonObject.get("style") != null ? jsonObject.getString("style") : "-fx-text-fill: #08c608;";
+       String icon = jsonObject.get("icon") != null ? jsonObject.getString("icon") : "N/A";
+       String locationPath = jsonObject.get("location") != null ? jsonObject.get("location").toString() : "N/A";
 
-           statusVal.setText(status);
-           typeVal.setText(type);
-           userVal.setText(organization);
-           expiryVal.setText(expiry);
-           ImageView iconView = (ImageView) statusLabel.getGraphic();
-           iconView.setImage(new Image(getClass().getResourceAsStream(icon)));
-           locationVal.setText(locationPath);
-           statusVal.setStyle(style);
-//        });
-        overLay.setVisible(false);
+       statusVal.setText(status);
+       failureCauseVal.setText(failureCause);
+       licenseNameVal.setText(licenseName);
+       expiryVal.setText(expiry);
+       ImageView iconView = (ImageView) statusLabel.getGraphic();
+       iconView.setImage(new Image(getClass().getResourceAsStream(icon)));
+       locationVal.setText(locationPath);
+       statusVal.setStyle(style);
+       overLay.setVisible(false);
     }
 }

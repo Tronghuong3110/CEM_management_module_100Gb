@@ -10,7 +10,7 @@ public class AddCssForBtnUtil {
         String buttonBaseStyle =
                 "-fx-background-color: transparent;" +
                         "-fx-text-fill: #000000;" +
-                        "-fx-font-size: 13px;" +
+                        "-fx-font-size: 16px;" +
                         "-fx-padding: 5px 10px;" +
                         "-fx-cursor: hand;" +
                         "-fx-alignment: center;" +

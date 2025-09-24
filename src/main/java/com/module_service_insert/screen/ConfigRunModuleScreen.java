@@ -1,6 +1,7 @@
 package com.module_service_insert.screen;
 
 import com.module_service_insert.action.TopBarHandler;
+import com.module_service_insert.exception.RunException;
 import com.module_service_insert.model.ConfigModel;
 import com.module_service_insert.model.tableData.ArgumentsTableData;
 import com.module_service_insert.model.tableData.ConfigClusterModuleTableData;
@@ -57,16 +58,17 @@ public class ConfigRunModuleScreen extends VBox {
     private ComboBox<ConfigModel> cbConfigByName;
 
     private VBox splitPane = new VBox();
-    private ObservableList<ConfigClusterModuleTableData> sampleData = FXCollections.observableArrayList();
     private String configName;
 
     private HashMap<String, Label> valueArgsMap = new HashMap<>();
     private Label argTitle;
     private final HashMap<String, ComboBox<String>> comboBoxByName = new HashMap<>();
+    private final List<ConfigRunModuleTableData> configRunModuleChecked;
 
     public ConfigRunModuleScreen(String name) {
         configPresenter = ConfigPresenter.getInstance();
         configName = name;
+        configRunModuleChecked = new ArrayList<>();
         initData();
         setSpacing(15);
         setStyle("-fx-padding: 5 15 15 15; -fx-background-insets: 0; -fx-background-color: #f3f3f3");
@@ -162,6 +164,12 @@ public class ConfigRunModuleScreen extends VBox {
         selectAllCheckBox.selectedProperty().addListener((obs, oldVal, newVal) -> {
             for (ConfigRunModuleTableData item : configRunModuleTable.getItems()) {
                 item.setSelected(newVal);
+                if(newVal) {
+                    configRunModuleChecked.add(item);
+                }
+                else {
+                    configRunModuleChecked.remove(item);
+                }
             }
         });
 
@@ -189,6 +197,12 @@ public class ConfigRunModuleScreen extends VBox {
                 if (!row.isEmpty()) {
                     ConfigRunModuleTableData item = row.getItem();
                     item.setSelected(!item.isSelected());
+                    if(item.isSelected()){
+                        configRunModuleChecked.add(item);
+                    }
+                    else {
+                        configRunModuleChecked.remove(item);
+                    }
                     argTitle.setText("Các tham số đầu vào của module: " + item.getModuleName());
                     Map<String, String> args = item.getArgs().getArgsMap();
                     for(Map.Entry<String, String> entry : args.entrySet()) {
@@ -224,12 +238,23 @@ public class ConfigRunModuleScreen extends VBox {
                 btnBox.setAlignment(Pos.CENTER);
                 startBtn.setOnAction(e -> {
                     ConfigRunModuleTableData item = getTableView().getItems().get(getIndex());
-                    System.out.println("Start: " + item.getModuleName());
+                    try {
+                        long pId = startModule(item.getCommand(), item.getModuleName(), item.getInterfaceName());
+                        item.setPid(pId);
+                    }
+                    catch (RunException ex) {
+                        AlertUtils.showAlert("Lỗi", ex.getMessage(), "ERROR");
+                    }
                 });
 
                 stopBtn.setOnAction(e -> {
                     ConfigRunModuleTableData item = getTableView().getItems().get(getIndex());
-                    System.out.println("Stop: " + item.getModuleName());
+                    try {
+                        killProcess(item.getPid(), item.getModuleName(), item.getInterfaceName());
+                    }
+                    catch (RunException ex) {
+                        AlertUtils.showAlert("Lỗi", ex.getMessage(), "ERROR");
+                    }
                 });
 
                 editBtn.setOnAction(e -> {
@@ -438,11 +463,10 @@ public class ConfigRunModuleScreen extends VBox {
         AddCssForBtnUtil.addCssStyleForBtn(runAllBtn);
         runAllBtn.setOnAction(e -> {
             boolean isRun = false;
-            for (ConfigRunModuleTableData item : configRunModuleTable.getItems()) {
-                if (item.isSelected()) {
-                    isRun = true;
-                    System.out.println("Chạy module: " + item.getModuleName());
-                }
+            for (ConfigRunModuleTableData item : configRunModuleChecked) {
+                isRun = true;
+                System.out.println("Chạy module: " + item.getModuleName());
+                startModule(item.getCommand(), item.getModuleName(), item.getInterfaceName());
             }
             if(!isRun) {
                 AlertUtils.showAlert("Cảnh báo", "Vui lòng chọn ít nhất một module cần chạy", "WARNING");
@@ -932,6 +956,29 @@ public class ConfigRunModuleScreen extends VBox {
         catch (Exception e) {
             e.printStackTrace();
             throw new RuntimeException(e);
+        }
+    }
+
+    private long startModule(String command, String moduleName, String interfaceName) {
+        try {
+            String exec = "cmd.exe /c start " + command;
+            Process p = Runtime.getRuntime().exec(exec);
+            return p.pid();
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+            throw new RunException("Chạy module: " + moduleName + " trên interface: " + interfaceName + " xảy ra lỗi.");
+        }
+    }
+
+    private void killProcess(long pId, String moduleName, String interfaceName) {
+        try {
+            String cmd = "taskkill /F /T /PID " + pId;
+            Runtime.getRuntime().exec(cmd);
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+            throw new RunException("Dừng module: " + moduleName + " trên interface: " + interfaceName + " đã xảy ra lỗi, vui lòng thử lại sau.");
         }
     }
 }

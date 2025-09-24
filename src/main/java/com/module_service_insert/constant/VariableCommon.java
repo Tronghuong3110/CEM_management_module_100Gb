@@ -9,4 +9,7 @@ public class VariableCommon {
     public static String DATABASE_NAME = "test";
     public static String DATABASE_USERNAME = "root";
     public static String DATABASE_PASSWORD = "1234";
+    public static String LICENSE_CHECK_MODULE_PATH = null;
+    public static String CONFIG_PATH = null;
+    public static String LICENSE_CHECK_MODULE_NAME = null;
 }

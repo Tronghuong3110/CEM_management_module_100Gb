@@ -111,13 +111,14 @@ public class ScreenNavigator {
         VBox sidebarContent = new VBox(16);
         sidebarContent.getChildren().addAll(logoBox, menuBox);
         VBox.setVgrow(menuBox, Priority.ALWAYS);
-        sidebar.setStyle("-fx-font-size: 16px;");
+        sidebar.setStyle("-fx-font-size: 18px;");
         sidebar.getChildren().add(sidebarContent);
 
         mainLayout.setLeft(sidebar);
         root.setLeft(mainLayout);
 
-        if (!items.isEmpty()) setActive(items, items.get(0));
+//        if (!items.isEmpty())
+        setActive(items, items.get(0));
     }
 
     // ===== Tạo 1 item trong sidebar =====

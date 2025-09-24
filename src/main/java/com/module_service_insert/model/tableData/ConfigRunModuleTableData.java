@@ -1,9 +1,6 @@
 package com.module_service_insert.model.tableData;
 
-import javafx.beans.property.BooleanProperty;
-import javafx.beans.property.SimpleBooleanProperty;
-import javafx.beans.property.SimpleStringProperty;
-import javafx.beans.property.StringProperty;
+import javafx.beans.property.*;
 
 /**
  * @author Trọng Hướng
@@ -15,6 +12,7 @@ public class ConfigRunModuleTableData {
     private final StringProperty command = new SimpleStringProperty();
     private final StringProperty interfaceName = new SimpleStringProperty();
     private final StringProperty clusterName = new SimpleStringProperty();
+    private final LongProperty pId = new SimpleLongProperty();
     private ArgumentsTableData argumentsTableData;
 
     public ConfigRunModuleTableData() {
@@ -48,4 +46,7 @@ public class ConfigRunModuleTableData {
         this.argumentsTableData = argumentsTableData;
     }
     public ArgumentsTableData getArgs() {return this.argumentsTableData;}
+
+    public void setPid(long pId) {this.pId.set(pId);}
+    public long getPid() {return this.pId.get();}
 }
