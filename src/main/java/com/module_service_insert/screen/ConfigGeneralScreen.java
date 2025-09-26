@@ -14,12 +14,16 @@ import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.*;
+import javafx.scene.control.cell.TextFieldTableCell;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
 import javafx.stage.Window;
+import javafx.util.Builder;
+import javafx.util.StringConverter;
+import javafx.util.converter.NumberStringConverter;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -114,6 +118,7 @@ public class ConfigGeneralScreen extends VBox {
 
     private void createInterfaceTable() {
         interfaceTable = new TableView<>();
+        interfaceTable.setEditable(true);
         TableColumn<InterfaceTableData, Number> sttCol = new TableColumn<>("STT");
         TableColumn<InterfaceTableData, String> nameColumn = CreateColumnTableUtil.createColumn("Name", InterfaceTableData::interfaceNameProperty);
         TableColumn<InterfaceTableData, String> driverCol = CreateColumnTableUtil.createColumn("Driver", InterfaceTableData::driverProperty);
@@ -179,6 +184,52 @@ public class ConfigGeneralScreen extends VBox {
                         getClass().getResource("/com/module_service_insert/css/table_row.css")
                 ).toExternalForm()
         );
+
+        rssCountCol.setEditable(true);
+        rssCountCol.setCellFactory(col -> new TextFieldTableCell<InterfaceTableData, Number>(new StringConverter<Number>() {
+            @Override
+            public String toString(Number object) {
+                return object == null ? "" : object.toString();
+            }
+
+            @Override
+            public Number fromString(String string) {
+                try {
+                    return Integer.parseInt(string.trim());
+                } catch (NumberFormatException e) {
+                    AlertUtils.showAlert("Cảnh báo", "Vui lòng chọn số rss là 1 số nguyên dương.", "WARNING");
+                    return null;
+                }
+            }
+        }));
+
+        rssCountCol.setOnEditCommit(event -> {
+            InterfaceTableData item = event.getRowValue();
+            try {
+                if(event.getNewValue() != null) {
+                    // họi hàm cấu hình lại rss
+                    String command = String.format("ethtool -L %s combined %d", item.getInterfaceName(), item.getRssCount());
+                    StringBuilder configRssCount = runCommand(command);
+                    if(!configRssCount.isEmpty()) {
+                        System.out.println(event.getOldValue());
+                        item.rssCountProperty().setValue(event.getOldValue());
+                        AlertUtils.showAlert(String.format("Cấu hình rss cho interface: %s lỗi", item.getInterfaceName()), configRssCount.toString(), "ERROR");
+                    }
+                    else {
+                        item.rssCountProperty().setValue(event.getNewValue());
+                        AlertUtils.showAlert("Thành công", "Cập nhật rss cho interface: " + item.getInterfaceName() + " thành công", "INFORMATION");
+                    }
+                }
+                else {
+                    item.rssCountProperty().setValue(event.getOldValue());
+                }
+                interfaceTable.refresh();
+            }
+            catch (Exception e) {
+                e.printStackTrace();
+                AlertUtils.showAlert("Lỗi", "Không thể cập nhật: " + item.getInterfaceName(), "ERROR");
+            }
+        });
     }
 
     protected void setColumnPercentWidth(TableColumn<?, ?> col, double percent) {
@@ -389,6 +440,7 @@ public class ConfigGeneralScreen extends VBox {
 
     private VBox createNumaHugePageTable() {
         numaHugePageTable = new TableView<>();
+        numaHugePageTable.setEditable(true);
         TableColumn<NumaHugePageTableData, Number> sttCol = new TableColumn<>("STT");
         TableColumn<NumaHugePageTableData, String> clusterNameCol = CreateColumnTableUtil.createColumn("Cluster name", NumaHugePageTableData::clusterNameProperty);
         TableColumn<NumaHugePageTableData, String> hugePagesTotal = CreateColumnTableUtil.createColumn("HugePages total", NumaHugePageTableData::hugePagesTotalProperty);
@@ -482,6 +534,68 @@ public class ConfigGeneralScreen extends VBox {
         box.setPadding(Insets.EMPTY);
         box.setStyle("-fx-padding: 0; -fx-background-insets: 0;");
         updateNumaHugePagePagination();
+
+        // chỉnh sửa huge pages
+        hugePagesTotal.setEditable(true);
+        hugePagesTotal.setCellFactory(col -> new TextFieldTableCell<NumaHugePageTableData, String>(new StringConverter<String>() {
+            @Override
+            public String toString(String object) {
+                return object == null ? "" : object.toString();
+            }
+
+            @Override
+            public String fromString(String string) {
+                try {
+                    return string.trim();
+                } catch (NumberFormatException e) {
+                    AlertUtils.showAlert("Cảnh báo", "Vui lòng chọn số rss là 1 số nguyên dương.", "WARNING");
+                    return null;
+                }
+            }
+        }));
+        hugePagesTotal.setOnEditCommit(event -> {
+            NumaHugePageTableData item = event.getRowValue();
+            try {
+                if(event.getNewValue() != null) {
+                    // họi hàm cấu hình lại rss
+                    int hugePagesTotalVal;
+                    try {
+                        hugePagesTotalVal = Integer.parseInt(event.getNewValue());
+                    }
+                    catch (NumberFormatException e) {
+                        AlertUtils.showAlert("Lỗi", "Vui lòng chọn hugepages total là 1 số nguyên dương.", "ERROR");
+                        return;
+                    }
+                    String command = String.format("echo %d > /sys/devices/system/node/%s/hugepages/hugepages-2048kB/nr_hugepages", hugePagesTotalVal, item.getClusterName());
+                    StringBuilder configRssCount = runCommand(command);
+                    if(!configRssCount.isEmpty()) {
+                        item.hugePagesTotalProperty().setValue(event.getOldValue());
+                        AlertUtils.showAlert(String.format("Cấu hình hugepages cho %s lỗi", item.getClusterName()), configRssCount.toString(), "ERROR");
+                    }
+                    else {
+                        try {
+                            int hugePageFree = Integer.parseInt(item.getHugePagesFree());
+                            int hugePageTotalOld = Integer.parseInt(event.getOldValue());
+                            item.hugePagesFreeProperty().setValue("" + (hugePageFree + hugePagesTotalVal - hugePageTotalOld));
+                        }
+                        catch (NumberFormatException e) {
+                            e.printStackTrace();
+                        }
+                        item.hugePagesTotalProperty().setValue(event.getNewValue());
+                        AlertUtils.showAlert("Thành công", "Cập nhật hugepages cho  " + item.getClusterName() + " thành công", "INFORMATION");
+                    }
+                }
+                else {
+                    item.hugePagesTotalProperty().setValue(event.getOldValue());
+                }
+                interfaceTable.refresh();
+            }
+            catch (Exception e) {
+                e.printStackTrace();
+                AlertUtils.showAlert("Lỗi", "Không thể cập nhật: " + item.getClusterName(), "ERROR");
+            }
+        });
+
         return box;
     }
 
@@ -651,5 +765,34 @@ public class ConfigGeneralScreen extends VBox {
                 numaHugePageTableDatas,
                 numaHugePageTable
         );
+    }
+
+    private StringBuilder runCommand(String command) {
+        try {
+            //  + String.format("ethtool -L %s combined %d '", interfaceName, rssCount)
+            String[] cmd = {"/bin/bash","-c","echo 123456 | sudo -S " + command};
+            Process process = Runtime.getRuntime().exec(cmd);
+            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+            String line;
+            StringBuilder error = new StringBuilder();
+            while((line = reader.readLine()) != null) {
+                System.out.println(line);
+                if(line.toLowerCase().contains("error")) {
+                    error.append("- ").append(line.split(": ")[1]).append("\n");
+                }
+            }
+
+            BufferedReader errorReader = new BufferedReader(new InputStreamReader(process.getErrorStream()));
+            while((line = errorReader.readLine()) != null) {
+                if(line.toLowerCase().contains("error")) {
+                    error.append("- ").append(line.split(": ")[1]).append("\n");
+                }
+            }
+            return error;
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+            throw new RuntimeException(e);
+        }
     }
 }
