@@ -1,6 +1,8 @@
 package com.module_service_insert.screen;
 
 import com.module_service_insert.action.TopBarHandler;
+import com.module_service_insert.constant.VariableCommon;
+import com.module_service_insert.exception.FileException;
 import com.module_service_insert.exception.RunException;
 import com.module_service_insert.model.ConfigModel;
 import com.module_service_insert.model.tableData.ArgumentsTableData;
@@ -11,6 +13,8 @@ import com.module_service_insert.utils.functionUtils.AlertUtils;
 import com.module_service_insert.utils.functionUtils.ChooseLocationFile;
 import com.module_service_insert.utils.functionUtils.NormalizeString;
 import com.module_service_insert.utils.screenUtils.*;
+import info.aduna.io.IndentingWriter;
+import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
@@ -26,6 +30,7 @@ import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 import javafx.scene.shape.Line;
+import javafx.scene.shape.LineTo;
 import javafx.stage.FileChooser;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
@@ -33,17 +38,30 @@ import javafx.stage.Window;
 import javafx.util.StringConverter;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import ucar.nc2.Variable;
 
-import java.io.File;
-import java.io.FileWriter;
+import java.io.*;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
+import java.nio.file.*;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.concurrent.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+import java.util.stream.LongStream;
 
 /**
  * @author Trọng Hướng
  */
 public class ConfigRunModuleScreen extends VBox {
+
+    private final Logger logger = LoggerFactory.getLogger(ConfigRunModuleScreen.class);
 
     private final PaginationUtil<ConfigRunModuleTableData> paginationUtil = new PaginationUtil();
     private final ConfigPresenter configPresenter;
@@ -64,12 +82,14 @@ public class ConfigRunModuleScreen extends VBox {
     private Label argTitle;
     private final HashMap<String, ComboBox<String>> comboBoxByName = new HashMap<>();
     private final List<ConfigRunModuleTableData> configRunModuleChecked;
+    private ScheduledExecutorService scheduler;
+
+    private StackPane overLay;
 
     public ConfigRunModuleScreen(String name) {
         configPresenter = ConfigPresenter.getInstance();
         configName = name;
         configRunModuleChecked = new ArrayList<>();
-        initData();
         setSpacing(15);
         setStyle("-fx-padding: 5 15 15 15; -fx-background-insets: 0; -fx-background-color: #f3f3f3");
 
@@ -99,6 +119,11 @@ public class ConfigRunModuleScreen extends VBox {
         """);
         Node argsBox = createArgsBox(new ConfigRunModuleTableData());
         getChildren().addAll(topBar, splitPane, argsBox);
+
+        overLay = new StackPane(new ProgressIndicator());
+        overLay.setStyle("-fx-background-color: rgba(0,0,0,0.3);");
+        overLay.setVisible(false);
+        getChildren().add(overLay);
     }
 
     private void createConfigTable() {
@@ -177,19 +202,18 @@ public class ConfigRunModuleScreen extends VBox {
             TableRow<ConfigRunModuleTableData> row = new TableRow<>() {
                 @Override
                 protected void updateItem(ConfigRunModuleTableData item, boolean empty) {
-                    super.updateItem(item, empty);
-
-                    if (empty || item == null) {
-                        setStyle("");
-                    } else if (isSelected()) {
-                        setStyle("-fx-background-color: #2f7a9a; -fx-text-fill: white;");
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setStyle("");
+                } else if (isSelected()) {
+                    setStyle("-fx-background-color: #2f7a9a; -fx-text-fill: white;");
+                } else {
+                    if (getIndex() % 2 == 0) {
+                        setStyle("-fx-background-color: #ffffff;");
                     } else {
-                        if (getIndex() % 2 == 0) {
-                            setStyle("-fx-background-color: #ffffff;");
-                        } else {
-                            setStyle("-fx-background-color: #f1f1f1f1;");
-                        }
+                        setStyle("-fx-background-color: #f1f1f1f1;");
                     }
+                }
                 }
             };
 
@@ -237,24 +261,79 @@ public class ConfigRunModuleScreen extends VBox {
             {
                 btnBox.setAlignment(Pos.CENTER);
                 startBtn.setOnAction(e -> {
+                    overLay.setVisible(true);
                     ConfigRunModuleTableData item = getTableView().getItems().get(getIndex());
-                    try {
-                        long pId = startModule(item.getCommand(), item.getModuleName(), item.getInterfaceName());
-                        item.setPid(pId);
-                    }
-                    catch (RunException ex) {
-                        AlertUtils.showAlert("Lỗi", ex.getMessage(), "ERROR");
-                    }
+                    CompletableFuture.supplyAsync(() -> {
+                        try {
+                            return startModule(item.getCommand(), item.getModuleName(), item.getInterfaceName());
+                        }
+                        catch (RunException ex) {
+                            throw ex;
+                        }
+                    })
+                    .thenAccept(message -> {
+                        Platform.runLater(() -> {
+                            if(message.isEmpty()) {
+                                item.setStatus("active");
+                                System.out.println("Chạy module thành công.");
+                                AlertUtils.showAlert("Thành công", "Chạy module: " + item.getModuleName() + " thành công.", "INFORMATION");
+                            }
+                            else {
+                                item.setStatus("error");
+                                AlertUtils.showAlertWithTextArea("Lỗi", message.toString(), "ERROR");
+                            }
+                            overLay.setVisible(false);
+                        });
+                    })
+                    .exceptionally(ex -> {
+                        Platform.runLater(() -> {
+                            item.setStatus("error");
+                            AlertUtils.showAlert("Lỗi", ex.getMessage(), "ERROR");
+                            overLay.setVisible(false);
+                        });
+                        return null;
+                    });
                 });
 
                 stopBtn.setOnAction(e -> {
                     ConfigRunModuleTableData item = getTableView().getItems().get(getIndex());
-                    try {
-                        killProcess(item.getPid(), item.getModuleName(), item.getInterfaceName());
-                    }
-                    catch (RunException ex) {
-                        AlertUtils.showAlert("Lỗi", ex.getMessage(), "ERROR");
-                    }
+                    overLay.setVisible(true);
+                    CompletableFuture.supplyAsync(() -> {
+                        try {
+                            return killProcess(item);
+                        }
+                        catch (RunException ex) {
+                            throw ex;
+                        }
+                    })
+                    .thenAccept(message -> {
+                        Platform.runLater(() -> {
+                            overLay.setVisible(false);
+                            if(message.isEmpty()) {
+                                item.setStatus("inactive");
+                                AlertUtils.showAlert("Thành công", "Dừng module " + item.getModuleName() + " thành công.", "INFORMATION");
+                            }
+                            else {
+                                AlertUtils.showAlert("Thất bại", "Dừng module " + item.getModuleName() + " thất bại.", "ERROR");
+                                boolean isModuleRunning = isProcessRunning(item.getCommand());
+                                if(!isModuleRunning) {
+                                    item.setStatus("inactive");
+                                }
+                            }
+                        });
+                    })
+                    .exceptionally(ex -> {
+                        Platform.runLater(() -> {
+                            overLay.setVisible(false);
+                            AlertUtils.showAlert("Lỗi", ex.getMessage(), "ERROR");
+                            // Dừng module lỗi ==> có cần check lại xem module có đang chạy nữa không
+                            boolean isModuleRunning = isProcessRunning(item.getCommand());
+                            if(!isModuleRunning){
+                                item.setStatus("inactive");
+                            }
+                        });
+                        return null;
+                    });
                 });
 
                 editBtn.setOnAction(e -> {
@@ -342,43 +421,7 @@ public class ConfigRunModuleScreen extends VBox {
 
                 File selectedFile = fileChooser.showOpenDialog(owner);
                 if(selectedFile != null) {
-                    try {
-                        List<ConfigRunModuleTableData> configRunModuleTableData = new ArrayList<>();
-                        String moduleContent = Files.readString(selectedFile.toPath());
-                        JSONArray jsonArray = new JSONArray(moduleContent);
-                        for(Object o : jsonArray) {
-                            JSONObject configModule = (JSONObject) o;
-                            ConfigRunModuleTableData moduleConfig = new ConfigRunModuleTableData(
-                                configModule.getString("module_name"),
-                                configModule.getString("status"),
-                                configModule.getString("command"),
-                                configModule.getString("interface_name"),
-                                ""
-                            );
-
-                            JSONObject argJson = (JSONObject) configModule.get("args");
-                            ArgumentsTableData arg = new ArgumentsTableData(
-                                argJson.getString("queue"),
-                                argJson.getString("cpu binding"),
-                                argJson.getString("output"),
-                                argJson.getString("thread"),
-                                argJson.getString("active wait")
-                            );
-                            moduleConfig.setArgs(arg);
-                            configRunModuleTableData.add(moduleConfig);
-                        }
-                        configRunModuleTableDatas.setAll(configRunModuleTableData);
-                        filterConfigRunModuleTableDatas.setAll(configRunModuleTableData);
-                        paginationUtil.updatePagination(pagination,
-                                filterConfigRunModuleTableDatas,
-                                configRunModuleTableDatas,
-                                configRunModuleTable
-                        );
-                    }
-                    catch (Exception e) {
-                        e.printStackTrace();
-                        AlertUtils.showAlert("Lỗi", "Cấu trúc file không đúng, vui lòng nhập file khác.", "ERROR");
-                    }
+                    readFileConfig(selectedFile.toPath());
                 }
             }
         };
@@ -386,7 +429,7 @@ public class ConfigRunModuleScreen extends VBox {
 
     protected HBox createFilterRow() {
         tfModuleName = new TextField();
-        tfModuleName.setPromptText("Tìm theo tên cụm");
+        tfModuleName.setPromptText("Tìm theo tên module");
         tfModuleName.textProperty().addListener((obs, o, n) -> filterNode());
         tfModuleName.getStyleClass().add("filter-text-field");
 
@@ -404,24 +447,10 @@ public class ConfigRunModuleScreen extends VBox {
             }
         });
 
-        List<ConfigModel> configModels = new ArrayList<>();
-        for(int i = 0; i < 10; i++) {
-            configModels.add(new ConfigModel(
-                "Config_" + i
-            ));
-        }
+        List<ConfigModel> configModels = readAllConfigFileFromFolder();
         cbConfigByName = new ComboBox<>();
         cbConfigByName.getItems().addAll(configModels);
         cbConfigByName.setPromptText("Chọn bản cấu hình theo tên");
-        if(configName == null || configName.isBlank()) {
-            cbConfigByName.getSelectionModel().selectFirst();
-        }
-        else {
-            configModels.stream()
-                    .filter(c -> c.getName().equals(configName))
-                    .findFirst()
-                    .ifPresent(c -> cbConfigByName.getSelectionModel().select(c));
-        }
         cbConfigByName.setConverter(new StringConverter<ConfigModel>() {
             @Override
             public String toString(ConfigModel config) {
@@ -439,7 +468,11 @@ public class ConfigRunModuleScreen extends VBox {
 
         cbConfigByName.valueProperty().addListener((obs, oldVal, newVal) -> {
             if (newVal != null) {
-                System.out.println("Chọn config: " + newVal.getName());
+                Path newPath = Paths.get(newVal.getPath());
+                boolean isFinishCopy = copyFile(newPath);
+                if(isFinishCopy) {
+                    readFileConfig(newPath);
+                }
             }
         });
 
@@ -462,21 +495,86 @@ public class ConfigRunModuleScreen extends VBox {
         Button runAllBtn = ButtonUtil.createBtn("Run all", "/com/module_service_insert/icons/play.png");
         AddCssForBtnUtil.addCssStyleForBtn(runAllBtn);
         runAllBtn.setOnAction(e -> {
-            boolean isRun = false;
-            for (ConfigRunModuleTableData item : configRunModuleChecked) {
-                isRun = true;
-                System.out.println("Chạy module: " + item.getModuleName());
-                startModule(item.getCommand(), item.getModuleName(), item.getInterfaceName());
-            }
-            if(!isRun) {
+            if(configRunModuleChecked.isEmpty()) {
                 AlertUtils.showAlert("Cảnh báo", "Vui lòng chọn ít nhất một module cần chạy", "WARNING");
+                return;
             }
+            overLay.setVisible(true);
+            CompletableFuture.supplyAsync(() -> {
+                StringBuilder messageRunModuleError = new StringBuilder();
+                for (ConfigRunModuleTableData item : configRunModuleChecked) {
+                    try {
+                        StringBuilder message = startModule(item.getCommand(), item.getModuleName(), item.getInterfaceName());
+                        Platform.runLater(() -> {
+                            if(message.isEmpty()) {
+                                item.setStatus("active");
+                            }
+                            else {
+                                messageRunModuleError.append(message).append("\n");
+                                item.setStatus("error");
+                            }
+                        });
+                    }
+                    catch (Exception ex) {
+                        Platform.runLater(() -> {
+                            item.setStatus("error");
+                        });
+                        ex.printStackTrace();
+                    }
+                }
+                return messageRunModuleError;
+            })
+            .thenAccept(message -> {
+                Platform.runLater(() -> {
+                    overLay.setVisible(false);
+                    if(!message.isEmpty()) {
+                        AlertUtils.showAlertWithTextArea("Lỗi", message.toString(), "ERROR");
+                    }
+                    else {
+                        AlertUtils.showAlert("Thành công", "Chạy module thành công.", "INFORMATION");
+                    }
+                });
+            });
         });
 
         Button stopAllBtn = ButtonUtil.createBtn("Stop all", "/com/module_service_insert/icons/stop.png");
         AddCssForBtnUtil.addCssStyleForBtn(stopAllBtn);
         stopAllBtn.setOnAction(e -> {
-            System.out.println("Dừng toàn bộ module.");
+            overLay.setVisible(true);
+            StringBuilder messageRunModuleError = new StringBuilder();
+            CompletableFuture.supplyAsync(() -> {
+                for (ConfigRunModuleTableData item : configRunModuleChecked) {
+                    try {
+                        System.out.println("Dừng module: " + item.getModuleName());
+                        StringBuilder messageRunStopModule = killProcess(item);
+                        Platform.runLater(() -> {
+                            if(messageRunStopModule.isEmpty()) {
+                                item.setStatus("inactive");
+                            }
+                            else {
+                                messageRunModuleError.append(messageRunStopModule);
+                                boolean isModuleRunning = isProcessRunning(item.getCommand());
+                                if(!isModuleRunning) {
+                                    item.setStatus("inactive");
+                                }
+                            }
+                        });
+                    }
+                    catch (Exception ex) {
+                        boolean isModuleRunning = isProcessRunning(item.getCommand());
+                        if(!isModuleRunning) {
+                            item.setStatus("inactive");
+                        }
+                    }
+                }
+                return messageRunModuleError;
+            })
+            .thenAccept(message -> {
+                Platform.runLater(() -> {
+                   overLay.setVisible(false);
+                    AlertUtils.showAlert("Thành công", "Dừng module thành công.", "INFORMATION");
+                });
+            });
         });
 
         Region spacer = new Region();
@@ -509,21 +607,16 @@ public class ConfigRunModuleScreen extends VBox {
             if (!nameFilter.isEmpty() && !name.contains(nameFilter)) match = false;
             if (!statusFilter.isEmpty() && !status.equals(statusFilter)) match = false;
             if (match) filteredData.add(item);
-            System.out.println("Status item: " + status + ", match: " + match);
         }
 
-        filterConfigRunModuleTableDatas.setAll(filteredData);
-        paginationUtil.updatePagination(pagination, filterConfigRunModuleTableDatas, configRunModuleTableDatas, configRunModuleTable);
+        paginationUtil.updatePagination(pagination, filterConfigRunModuleTableDatas, filteredData, configRunModuleTable);
     }
 
     public void showTable() {
         try {
             this.getStylesheets().add(this.getClass().getResource("/com/module_service_insert/css/header_table.css").toExternalForm());
-//            List<ConfigClusterModuleTableData> configClusterModuleTableDatas = configPresenter.findAll(cbConfigByName.getValue().getId());
-//            infoConfigModuleRunTableDatas.setAll(configClusterModuleTableDatas);
-//            filterInfoConfigModuleRunTableDatas.setAll(configClusterModuleTableDatas);
-//            infoConfigModuleRunTableDataTable.setItems(filterInfoConfigModuleRunTableDatas);
-//            paginationUtil.updatePagination(pagination, filterInfoConfigModuleRunTableDatas, infoConfigModuleRunTableDatas, infoConfigModuleRunTableDataTable);
+            Path path = Paths.get(VariableCommon.ACTIVE_CONFIG_DIRECTORY_PATH + "active_config_file.json");
+            readFileConfig(path);
         }
         catch (Exception e) {
             e.printStackTrace();
@@ -552,14 +645,13 @@ public class ConfigRunModuleScreen extends VBox {
         titleBox.setAlignment(Pos.CENTER);
 
         // ====== Hàng 1 (Module, Interface, Command, Node) ======
+        List<String> modules = readFileModules();
         VBox moduleBox = createLabeledCombo("Module", "Chọn module",
-                "Module A", "Module B", "Module C");
+                modules);
 
+        List<String> interfaces = getAllInterface();
         VBox interfaceBox = createLabeledCombo("Interface", "Chọn interface",
-                "Interface 1", "Interface 2");
-
-        VBox nodeBox = createLabeledCombo("Node", "Chọn node",
-                "Node X", "Node Y");
+                interfaces);
 
         Label lbl = new Label("Command");
         lbl.setStyle("-fx-font-size: 14;");
@@ -576,8 +668,7 @@ public class ConfigRunModuleScreen extends VBox {
         topRow.setVgap(10);
         topRow.add(moduleBox, 0, 0);
         topRow.add(interfaceBox, 1, 0);
-        topRow.add(commandBox, 2, 0, 2, 1); // chiếm 2 cột
-        topRow.add(nodeBox, 4, 0);
+        topRow.add(commandBox, 2, 0, 2, 1);
 
         ColumnConstraints cc1 = new ColumnConstraints();
         cc1.setPercentWidth(16.7);
@@ -607,7 +698,6 @@ public class ConfigRunModuleScreen extends VBox {
         if(item != null) {
             comboBoxByName.get("Module").setValue(item.getModuleName());
             comboBoxByName.get("Interface").setValue(item.getInterfaceName());
-            comboBoxByName.get("Node").setValue(item.getClusterName());
             tfCommand.setText(item.getCommand());
 
             for(Map.Entry<String, String> entry : item.getArgs().getArgsMap().entrySet()) {
@@ -621,6 +711,7 @@ public class ConfigRunModuleScreen extends VBox {
                             default -> "Unknown";
                         };
                 addItemArgForm(argsContainer, argTypes, inputArgs, argType, entry.getValue());
+//                System.out.println("Args: " + inputArgs.size());
             }
         }
         addArgBtn.setOnAction(e -> {
@@ -664,9 +755,53 @@ public class ConfigRunModuleScreen extends VBox {
         cancelBtn.setOnMouseClicked(e -> dialogStage.close());
 
         saveBtn.setOnMouseClicked(e -> {
-            inputArgs.forEach((k, v) -> {
-                System.out.println(k + " = " + v.getText());
-            });
+            try {
+                System.out.println("Start update config");
+                HashMap<String, String> args = new HashMap<>();
+                inputArgs.forEach((k, v) -> {
+                    args.put(k, v.getText());
+                });
+                String interfaceName = comboBoxByName.get("Interface").getValue();
+                String moduleName = comboBoxByName.get("Module").getValue();
+                if(interfaceName == null || moduleName == null) {
+                    AlertUtils.showAlert("Cảnh báo", "Vui lòng chọn interface và module.", "WARNING");
+                    return;
+                }
+                // đang chọn file cấu hình để hiển thị
+                if(cbConfigByName.getValue() != null) {
+                    System.out.println("Cập nhật cấu hình đang chọn.");
+                    updateConfig(cbConfigByName.getValue().getPath(),  moduleName,
+                            cbStatus.getValue(), tfCommand.getText(), interfaceName, args,
+                            item.getId());
+                }
+                String path = VariableCommon.ACTIVE_CONFIG_DIRECTORY_PATH + "active_config_file.json";
+                updateConfig(path, moduleName,
+                        cbStatus.getValue(), tfCommand.getText(), interfaceName, args,
+                        item != null ? item.getId() : null);
+                AlertUtils.showAlert("Thành công", "Cập nhật cấu hình thành công.", "INFORMATION");
+                if(item != null) {
+                    item.setModuleName(moduleName);
+                    item.setInterfaceName(interfaceName);
+                    item.setStatus(cbStatus.getValue());
+                    item.setCommand(tfCommand.getText());
+                    item.getArgs().setArgsMap(args);
+                    for(Map.Entry<String, String> entry : args.entrySet()) {
+                        Label arglabel = valueArgsMap.get(entry.getKey());
+                        arglabel.setText(entry.getValue());
+                    }
+                }
+                else {
+                    ConfigRunModuleTableData configRunModuleTableData = new ConfigRunModuleTableData(moduleName, cbStatus.getValue(), tfCommand.getText(), interfaceName, "");
+                    configRunModuleTableData.getArgs().setArgsMap(args);
+                    configRunModuleTableDatas.add(configRunModuleTableData);
+                    filterConfigRunModuleTableDatas.add(configRunModuleTableData);
+                }
+                configRunModuleTable.refresh();
+                dialogStage.close();
+            }
+            catch(Exception ex){
+                AlertUtils.showAlertWithTextArea("Lỗi", ex.getMessage(), "ERROR");
+            }
         });
 
         // ====== Root Layout ======
@@ -690,7 +825,7 @@ public class ConfigRunModuleScreen extends VBox {
         dialogStage.showAndWait();
     }
 
-    private VBox createLabeledCombo(String label, String prompt, String... items) {
+    private VBox createLabeledCombo(String label, String prompt, List<String> items) {
         Label lbl = new Label(label);
         lbl.setStyle("-fx-font-size: 14;");
         ComboBox<String> combo = new ComboBox<>();
@@ -716,26 +851,6 @@ public class ConfigRunModuleScreen extends VBox {
         GridPane.setHgrow(box, Priority.ALWAYS);
         box.setMaxWidth(Double.MAX_VALUE);
         return box;
-    }
-
-    private void initData() {
-        for(int i = 0; i < 20; i++) {
-            ConfigRunModuleTableData configRunModuleTableData = new ConfigRunModuleTableData(
-                "Module_" + i,
-                    i % 2 == 0 ? "active" : "inactive",
-                    "java -jar Module_" + i,
-                    "interface_" + i,
-                    "Node_" + i
-            );
-            configRunModuleTableData.setArgs(new ArgumentsTableData(
-                    String.valueOf(i + 10), String.format("%s, %s, %s", (i+1), (i+2), (i+3)),
-                    "/var/log/cem100Gb/Module_" + i,
-                    "8",
-                    "10"
-            ));
-            configRunModuleTableDatas.add(configRunModuleTableData);
-            filterConfigRunModuleTableDatas.add(configRunModuleTableData);
-        }
     }
 
     private Node createArgsBox(ConfigRunModuleTableData item) {
@@ -922,7 +1037,6 @@ public class ConfigRunModuleScreen extends VBox {
                 input.setEditable(true);
                 input.setOnMouseClicked(null);
             }
-            inputArgs.put(selected.toLowerCase(), input);
         });
         if(argsContainer.getChildren().isEmpty()) {
             argsContainer.setStyle(
@@ -934,11 +1048,14 @@ public class ConfigRunModuleScreen extends VBox {
                     "-fx-background-radius: 5;"
             );
         }
+        if(combo.getValue() != null) {
+            inputArgs.put(combo.getValue().toLowerCase(), input);
+        }
         argsContainer.getChildren().add(rowBox);
     }
 
     private void saveFile(String filePath) {
-        JSONArray jsonArray = new JSONArray();
+        JSONObject root = new JSONObject();
         try {
             for(ConfigRunModuleTableData moduleConfig : configRunModuleTableDatas) {
                 JSONObject jsonObject = new JSONObject();
@@ -947,10 +1064,10 @@ public class ConfigRunModuleScreen extends VBox {
                 jsonObject.put("command", moduleConfig.getCommand());
                 jsonObject.put("interface_name", moduleConfig.getInterfaceName());
                 jsonObject.put("args", moduleConfig.getArgs().getArgsMap());
-                jsonArray.put(jsonObject);
+                root.put(moduleConfig.getId() == null ? String.valueOf(System.nanoTime()) : moduleConfig.getId(), jsonObject);
             }
             FileWriter fileWriter = new FileWriter(filePath, StandardCharsets.UTF_8);
-            fileWriter.write(jsonArray.toString());
+            fileWriter.write(root.toString());
             fileWriter.close();
         }
         catch (Exception e) {
@@ -959,26 +1076,374 @@ public class ConfigRunModuleScreen extends VBox {
         }
     }
 
-    private long startModule(String command, String moduleName, String interfaceName) {
+    private StringBuilder startModule(String command, String moduleName, String interfaceName) {
         try {
-            String exec = "cmd.exe /c start " + command;
+            String[] exec = {"gnome-terminal", "--title=" + moduleName, "--", "bash", "-c", command + "; exec bash"};
+            logger.info("Run module: {}", Arrays.toString(exec));
+            boolean isModuleRunning = isProcessRunning(command);
+            if(isModuleRunning) {
+                System.out.println(String.format("Module: %s đang được chạy với command: %s.",moduleName, command));
+                return new StringBuilder();
+            }
+            System.out.println(Arrays.toString(exec));
             Process p = Runtime.getRuntime().exec(exec);
-            return p.pid();
+//            BufferedReader readError = new BufferedReader(new InputStreamReader(p.getErrorStream()));
+            StringBuilder messageError = new StringBuilder();
+//            CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
+//                try {
+//                    String error;
+//                    while((error = readError.readLine()) != null) {
+//                        logger.error();
+//                        messageError.append(error);
+//                    }
+//                }
+//                catch (Exception e) {
+//                    e.printStackTrace();
+//                }
+//            });
+//            future.orTimeout(10, TimeUnit.SECONDS);
+//            future.join();
+            return messageError;
         }
         catch (Exception e) {
             e.printStackTrace();
+            logger.error("Run module error, details: ", e);
             throw new RunException("Chạy module: " + moduleName + " trên interface: " + interfaceName + " xảy ra lỗi.");
         }
     }
 
-    private void killProcess(long pId, String moduleName, String interfaceName) {
+    private StringBuilder killProcess(ConfigRunModuleTableData item) {
         try {
-            String cmd = "taskkill /F /T /PID " + pId;
-            Runtime.getRuntime().exec(cmd);
+            String[] cmd = {"pkill", "-f", item.getCommand()};
+            logger.info("Stop module: {}", Arrays.toString(cmd));
+            Process p = Runtime.getRuntime().exec(cmd);
+            BufferedReader readError = new BufferedReader(new InputStreamReader(p.getErrorStream()));
+            StringBuilder messageError = new StringBuilder();
+            CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
+                try {
+                    String line;
+                    while((line = readError.readLine()) != null) {
+                        messageError.append("- ").append(line).append("\n");
+                    }
+                }
+                catch (Exception e) {
+                    e.printStackTrace();
+                }
+            });
+            future.orTimeout(10, TimeUnit.SECONDS);
+            future.join();
+            return messageError;
         }
         catch (Exception e) {
             e.printStackTrace();
-            throw new RunException("Dừng module: " + moduleName + " trên interface: " + interfaceName + " đã xảy ra lỗi, vui lòng thử lại sau.");
+            logger.error("Stop module error, details: ", e);
+            throw new RunException("Dừng module: " + item.getModuleName() + " trên interface: " + item.getInterfaceName() + " đã xảy ra lỗi, vui lòng thử lại sau.");
         }
+    }
+
+    private List<ConfigModel> readAllConfigFileFromFolder() {
+        List<ConfigModel> configModels = new ArrayList<>();
+        File folderRoot = new File(VariableCommon.CONFIG_DIRECTORY_PATH);
+        File[] configFiles = folderRoot.listFiles(new FilenameFilter() {
+            @Override
+            public boolean accept(File dir, String name) {
+                return name.toLowerCase().endsWith(".json");
+            }
+        });
+        assert configFiles != null;
+        for(File configFile : configFiles) {
+            configModels.add(new ConfigModel(configFile.getName(), configFile.getPath()));
+        }
+        return configModels;
+    }
+
+    private void readFileConfig(Path path) {
+        try {
+            logger.info("Read config file: {}", path);
+            List<ConfigRunModuleTableData> configRunModuleTableData = new ArrayList<>();
+            String moduleContent = Files.readString(path);
+            JSONObject root = new JSONObject(moduleContent);
+            for(String key : root.keySet()) {
+                JSONObject configModule = root.getJSONObject(key);
+                ConfigRunModuleTableData moduleConfig = new ConfigRunModuleTableData(
+                        configModule.getString("module_name"),
+                        configModule.getString("status"),
+                        configModule.getString("command"),
+                        configModule.getString("interface_name"),
+                        ""
+                );
+
+                JSONObject argJson = (JSONObject) configModule.get("args");
+                ArgumentsTableData arg = new ArgumentsTableData(
+                        !argJson.has("queue") ? "Unknown" : argJson.getString("queue"),
+                        !argJson.has("cpu binding") ? "Unknown" : argJson.getString("cpu binding"),
+                        !argJson.has("output") ? "Unknown" : argJson.getString("output"),
+                        !argJson.has("thread") ? "Unknown" : argJson.getString("thread"),
+                        !argJson.has("active wait") ? "Unknown" : argJson.getString("active wait")
+                );
+                moduleConfig.setArgs(arg);
+                moduleConfig.setId(key);
+                configRunModuleTableData.add(moduleConfig);
+            }
+            configRunModuleTableDatas.setAll(configRunModuleTableData);
+            filterConfigRunModuleTableDatas.setAll(configRunModuleTableData);
+
+            paginationUtil.updatePagination(pagination,
+                    filterConfigRunModuleTableDatas,
+                    configRunModuleTableDatas,
+                    configRunModuleTable
+            );
+        }
+        catch (NoSuchFileException exception) {
+            AlertUtils.showAlert("Lỗi", "Chưa từng chọn file cấu hình nào.", "ERROR");
+            logger.error("Read file config error: {}, details: ", path, exception);
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+            logger.error("Read file config error: {}, details: ", path, e);
+            AlertUtils.showAlert("Lỗi", "Cấu trúc file không đúng, vui lòng nhập file khác.", "ERROR");
+        }
+    }
+
+    private boolean copyFile(Path path) {
+        try {
+            File srcFile = new File(path.toString());
+            File destFile = new File(VariableCommon.ACTIVE_CONFIG_DIRECTORY_PATH + "active_config_file.json");
+            Files.copy(srcFile.toPath(), destFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+            return true;
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+            logger.error("Copy file error, details: ", e);
+            AlertUtils.showAlert("Lỗi", "Cấu hình file active lỗi.", "ERROR");
+        }
+        return false;
+    }
+    private void updateConfig(String path, String moduleName, String status, String command, String interfaceName, HashMap<String, String> args, String configId) {
+        try {
+            String content = new String(Files.readAllBytes(Paths.get(path)));
+            JSONObject root = new JSONObject(content);
+            JSONObject jsonObject = new JSONObject();
+            jsonObject.put("module_name", moduleName);
+            jsonObject.put("status", status);
+            jsonObject.put("command", command);
+            jsonObject.put("interface_name", interfaceName);
+            jsonObject.put("args", args);
+            root.put(configId == null ? String.valueOf(System.nanoTime()) : configId, jsonObject);
+            FileWriter fileWriter = new FileWriter(path.toString(), StandardCharsets.UTF_8);
+            fileWriter.write(root.toString());
+            fileWriter.flush();
+            fileWriter.close();
+        }
+        catch (NoSuchFileException e) {
+            logger.error("update config error, details: ", e);
+            throw new FileException(e.getMessage());
+        }
+        catch (Exception e) {
+            logger.error("update config error, details: ", e);
+            throw new FileException("Không thể xử lý file: " + path);
+        }
+    }
+
+    private List<String> readFileModules() {
+        try {
+            File file = new File("./module_name.txt");
+            if(!file.exists()) {
+                AlertUtils.showAlert("Cảnh báo", "File danh sách tên module không tồn tại.", "WARNING");
+                return new ArrayList<>();
+            }
+            BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(file)));
+            String line;
+            List<String> moduleNames = new ArrayList<>();
+            while((line = reader.readLine()) != null) {
+                moduleNames.add(line);
+            }
+            return moduleNames;
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+            throw new FileException("Không thể xử lý file danh sách các modules.");
+        }
+    }
+
+    private List<String> getAllInterface() {
+        Process process = null;
+        StringBuilder errorStr = new StringBuilder();
+        try {
+            String command = "pf_ringcfg --list-interfaces";
+            logger.info("Start get list interfaces, command: {}", command);
+            process = Runtime.getRuntime().exec(command);
+            List<String> interfaces = new ArrayList<>();
+            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+            BufferedReader error = new BufferedReader(new  InputStreamReader(process.getErrorStream()));
+            List<CompletableFuture<Void>> futures = new ArrayList<>();
+            CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
+                try {
+                    String line;
+                    Pattern p = Pattern.compile (
+                            "Name:\\s*(\\S*)\\s+Driver:\\s*(\\S*)\\s+RSS:\\s*(\\d*|Unknown)\\s+\\[(.*)]"
+                    );
+                    while((line = reader.readLine()) != null) {
+                        Matcher m = p.matcher(line);
+                        if(m.find()) {
+                            String interfaceName = m.group(1);
+                            interfaces.add(interfaceName);
+                        }
+                    }
+                }
+                catch (Exception e) {
+                    e.printStackTrace();
+                }
+            });
+            futures.add(future);
+            CountDownLatch countDownLatch = new CountDownLatch(1);
+            CompletableFuture<Void> futureError = CompletableFuture.runAsync(() -> {
+                try {
+                   countDownLatch.countDown();
+                   String errorMessage;
+                   while((errorMessage = error.readLine()) != null) {
+                       errorStr.append("- ").append(errorMessage).append("\n");
+                   }
+               }
+               catch (Exception e) {
+                   e.printStackTrace();
+               }
+            });
+            futures.add(futureError);
+            countDownLatch.await();
+            futureError.get(5, TimeUnit.SECONDS);
+            CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+            return interfaces;
+        }
+        catch (TimeoutException e) {
+            e.printStackTrace();
+            process.destroy();
+            logger.error("Get list interface error, details: ", e);
+            if(!errorStr.isEmpty()) {
+                AlertUtils.showAlertWithTextArea("Lỗi", errorStr.toString(), "ERROR");
+            }
+        }
+        catch (IOException e) {
+            e.printStackTrace();
+            logger.error("Get list interface error, details: ", e);
+            AlertUtils.showAlert("Lỗi", e.getMessage(), "ERROR");
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+            logger.error("Get list interface error, details: ", e);
+        }
+        return new ArrayList<>();
+    }
+
+    private boolean isProcessRunning(String command) {
+        try {
+            String[] exec = {"bash", "-c",  "pgrep -f \"" + command + "\""};
+            Process process = new ProcessBuilder(exec).start();
+            return process.waitFor() == 0;
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    private void updateStatusModuleRun(List<ConfigRunModuleTableData> configRunModuleTableDatas) {
+        try {
+            String content = new String(Files.readAllBytes(Paths.get(VariableCommon.ACTIVE_CONFIG_DIRECTORY_PATH + "active_config_file.json")));
+            JSONObject contentObject = new JSONObject(content);
+            FileWriter writer = new FileWriter(VariableCommon.ACTIVE_CONFIG_DIRECTORY_PATH + "active_config_file.json");
+            for(ConfigRunModuleTableData configRunModuleTableData : configRunModuleTableDatas) {
+                if(!configRunModuleTableData.isUpdate()) continue;
+                String moduleId = configRunModuleTableData.getId();
+                if (contentObject.has(moduleId)) {
+                    JSONObject config = contentObject.getJSONObject(moduleId);
+                    config.put("status", configRunModuleTableData.getStatus());
+                    contentObject.put(moduleId, config);
+                }
+            }
+            writer.write(contentObject.toString());
+            writer.flush();
+            writer.close();
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+            logger.error("update status module run error, details: ", e);
+        }
+    }
+
+    private void checkStatusModuleInterval() {
+        Set<String> interfaces = new HashSet<>();
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
+        for(ConfigRunModuleTableData configRunModuleTableData : configRunModuleTableDatas) {
+            String interfaceName = configRunModuleTableData.getInterfaceName();
+            interfaces.add(interfaceName);
+        }
+        scheduler.scheduleAtFixedRate(() -> {
+            System.out.println("Checking status module interval");
+            String folderLog = "/var/log/cem100Gb/";
+            File folderRoot = new File(folderLog);
+            if(!folderRoot.exists()) {
+                System.out.println("Folder: " + folderLog + " không tồn tại.");
+                return;
+            }
+            Map<String, Long> lastModifiedFiles = interfaces.stream()
+                    .map(key -> {
+                        File latest = Arrays.stream(Objects.requireNonNull(folderRoot.listFiles()))
+                                .filter(file -> file.getName().contains(key))
+                                .max(Comparator.comparingLong(File::lastModified))
+                                .orElse(null);
+                        return new AbstractMap.SimpleEntry<>(key, latest);
+                    })
+                    .filter(entry -> entry.getValue() != null)
+                    .collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue().lastModified()));
+            for(ConfigRunModuleTableData configRunModuleTableData : configRunModuleTableDatas) {
+                String interfaceName = configRunModuleTableData.getInterfaceName();
+                // TH không có log file và status là active ==> báo lỗi
+                Platform.runLater(() -> {
+                    // && configRunModuleTableData.getStatus().equals("active")
+                    if(!lastModifiedFiles.containsKey(interfaceName)) {
+                        boolean isModuleRunning = isProcessRunning(configRunModuleTableData.getCommand());
+                        // module vẫn đang chạy nhưng không có log
+                        if(isModuleRunning) {
+                            configRunModuleTableData.setStatus("error");
+                            configRunModuleTableData.setIsUpdate(true);
+                            logger.debug("Module: {} đang chạy nhưng không có log file.", configRunModuleTableData.getModuleName());
+                        }
+                        // TH không có log và module đang không chạy
+                        else if(!configRunModuleTableData.getStatus().equals("inactive")){
+                            configRunModuleTableData.setStatus("inactive");
+                            configRunModuleTableData.setIsUpdate(true);
+                        }
+                    }
+                    else {
+                        long lastModifiedFile = lastModifiedFiles.get(interfaceName);
+                        long currentTime = System.currentTimeMillis();
+                        // check trong 2 chu kì không thấy có log ==> cần check lại xem có đang chạy hay không
+                        if(Math.abs(lastModifiedFile - currentTime) > 10000) {
+                            boolean isModuleRunning = isProcessRunning(configRunModuleTableData.getCommand());
+                            // Sau 2 chu kì không có log, nhưng module vẫn đang chạy
+                            if(isModuleRunning) {
+                                configRunModuleTableData.setStatus("error");
+                            }
+                            // sau 2 chu kì không có log và module cũng đang không chạy
+                            else if(!configRunModuleTableData.getStatus().equals("inactive")) {
+                                configRunModuleTableData.setIsUpdate(true);
+                                configRunModuleTableData.setStatus("inactive");
+                            }
+                            logger.debug("Module: {} không có số liệu, lần có số liệu gần nhất: {}", configRunModuleTableData.getModuleName(), formatter.format(LocalDateTime.ofInstant(Instant.ofEpochMilli(lastModifiedFile),  ZoneId.of("UTC"))));
+                        }
+                        else if(!configRunModuleTableData.getStatus().equals("active")) {
+                            configRunModuleTableData.setStatus("active");
+                            configRunModuleTableData.setIsUpdate(true);
+                        }
+                    }
+                });
+            }
+            updateStatusModuleRun(configRunModuleTableDatas);
+        }, 0, 5, TimeUnit.SECONDS);
+    }
+    public void setScheduler(ScheduledExecutorService scheduler) {
+        this.scheduler = scheduler;
+        checkStatusModuleInterval();
     }
 }

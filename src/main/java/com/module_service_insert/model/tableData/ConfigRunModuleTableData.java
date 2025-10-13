@@ -14,6 +14,8 @@ public class ConfigRunModuleTableData {
     private final StringProperty clusterName = new SimpleStringProperty();
     private final LongProperty pId = new SimpleLongProperty();
     private ArgumentsTableData argumentsTableData;
+    private String id;
+    private boolean isUpdate;
 
     public ConfigRunModuleTableData() {
         argumentsTableData = new ArgumentsTableData();
@@ -49,4 +51,13 @@ public class ConfigRunModuleTableData {
 
     public void setPid(long pId) {this.pId.set(pId);}
     public long getPid() {return this.pId.get();}
+    public void setId (String id) {this.id=id;}
+    public String getId() {return this.id;}
+    public void setCommand(String command) { this.command.set(command); }
+    public void setModuleName(String moduleName) {this.moduleName.set(moduleName);}
+    public void setStatus(String status) {this.status.set(status);}
+    public void setInterfaceName(String interfaceName) {this.interfaceName.set(interfaceName);}
+
+    public void setIsUpdate(boolean isUpdate) {this.isUpdate = isUpdate;}
+    public boolean isUpdate() {return this.isUpdate;}
 }

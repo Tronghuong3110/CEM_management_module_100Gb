@@ -1,3 +1,40 @@
 <configuration debug="false">
+    <statusListener class="ch.qos.logback.core.status.NopStatusListener" />
 
+    <property name="LOG_DIR" value="logs" />
+    <timestamp key="timestamp" datePattern="yyyy-MM-dd"/>
+
+    <appender name="LOG_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_DIR}/service.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <!-- log quay theo ngày + index -->
+            <fileNamePattern>${LOG_DIR}/service.%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <!-- dung lượng tối đa của 1 file -->
+            <maxFileSize>1GB</maxFileSize>
+            <!-- giữ log trong 3 ngày -->
+            <maxHistory>3</maxHistory>
+            <!-- tổng dung lượng tối đa cho toàn bộ log -->
+            <totalSizeCap>10GB</totalSizeCap>
+        </rollingPolicy>
+        <encoder>
+            <charset>UTF-8</charset>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <!-- Loggers -->
+    <logger name="com.module_service_insert.screen" level="DEBUG" additivity="false">
+        <appender-ref ref="LOG_FILE"/>
+    </logger>
+
+    <!-- Root logger -->
+    <root level="ERROR">
+        <appender-ref ref="CONSOLE"/>
+    </root>
 </configuration>

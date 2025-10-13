@@ -26,6 +26,8 @@ import javafx.util.StringConverter;
 import javafx.util.converter.NumberStringConverter;
 import org.json.JSONArray;
 import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
@@ -33,6 +35,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -40,6 +45,8 @@ import java.util.regex.Pattern;
  * @author Trọng Hướng
  */
 public class ConfigGeneralScreen extends VBox {
+
+    private final Logger logger = LoggerFactory.getLogger(ConfigGeneralScreen.class);
 
     private final VBox splitPane = new VBox(15);
     private final PaginationUtil<InterfaceTableData> interfacePaginationUtil = new PaginationUtil();
@@ -207,13 +214,14 @@ public class ConfigGeneralScreen extends VBox {
             InterfaceTableData item = event.getRowValue();
             try {
                 if(event.getNewValue() != null) {
-                    // họi hàm cấu hình lại rss
-                    String command = String.format("ethtool -L %s combined %d", item.getInterfaceName(), item.getRssCount());
+                    // gọi hàm cấu hình lại rss
+                    String command = String.format("ethtool -L %s combined %d", item.getInterfaceName(), event.getNewValue().intValue());
+                    logger.info("Update rss for interfacee: {}, command: {}", item.getInterfaceName(), command);
                     StringBuilder configRssCount = runCommand(command);
                     if(!configRssCount.isEmpty()) {
                         System.out.println(event.getOldValue());
                         item.rssCountProperty().setValue(event.getOldValue());
-                        AlertUtils.showAlert(String.format("Cấu hình rss cho interface: %s lỗi", item.getInterfaceName()), configRssCount.toString(), "ERROR");
+                        AlertUtils.showAlertWithTextArea(String.format("Cấu hình rss cho interface: %s lỗi", item.getInterfaceName()), configRssCount.toString(), "ERROR");
                     }
                     else {
                         item.rssCountProperty().setValue(event.getNewValue());
@@ -276,6 +284,7 @@ public class ConfigGeneralScreen extends VBox {
                             "INFORMATION");
                 } catch (Exception e) {
                     e.printStackTrace();
+                    logger.error("Export config error, details: ", e);
                     AlertUtils.showAlert("Lỗi",
                             "Xuất dữ liệu thất bại", "ERROR");
                 }
@@ -334,6 +343,8 @@ public class ConfigGeneralScreen extends VBox {
                     }
                     catch (Exception e) {
                         e.printStackTrace();
+                        logger.error("Import file config error, details: ", e);
+                        AlertUtils.showAlert("Lỗi", "Không thể thực hiện import file config, thử lại sau.", "ERROR");
                     }
                 }
             }
@@ -388,19 +399,24 @@ public class ConfigGeneralScreen extends VBox {
         try {
             this.getStylesheets().add(this.getClass().getResource("/com/module_service_insert/css/header_table.css").toExternalForm());
             // lấy danh sách interface
-            List<String> lines = Arrays.asList(
-                    "Name: enp4s0f0np0          Driver: bnxt_en    RSS:     48   [Linux Driver]",
-                    "Name: ens3f0np0            Driver: i40e       RSS:     96   [Supported by ZC]",
-                    "Name: enp4s0f1np1          Driver: bnxt_en    RSS:     48   [Linux Driver]",
-                    "Name: ens3f1np1            Driver: i40e       RSS:     96   [Supported by ZC]",
-                    "Name: ens3f2np2            Driver: i40e       RSS:     96   [Supported by ZC]",
-                    "Name: ens3f3np3            Driver: i40e       RSS:     96   [Supported by ZC]",
-                    "Name: enxbe3af2b6059f      Driver: rndis_host RSS:     1    [Linux Driver]",
-                    "Name: ens5f0np0            Driver: ice        RSS:     4    [Running ZC]",
-                    "Name: ens5f1np1            Driver: ice        RSS:     4    [Running ZC]",
-                    "Name: ens4f0np0            Driver: ice        RSS:     4    [Running ZC]",
-                    "Name: ens4f1np1            Driver: ice        RSS:     1    [Running ZC]"
-            );
+            List<String> lines = new ArrayList<>();
+            try {
+                System.out.println("Start get list interfaces");
+                String commandShowInterface = "pf_ringcfg --list-interfaces";
+                Process process = Runtime.getRuntime().exec(commandShowInterface);
+                BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+                String line;
+                while((line = reader.readLine()) != null) {
+                    System.out.println(line);
+                    lines.add(line.trim());
+                }
+            }
+            catch (Exception e) {
+                e.printStackTrace();
+                AlertUtils.showAlert("Lỗi", e.getMessage(), "ERROR");
+                return;
+            }
+
             List<InterfaceTableData> interfaces = parseInterfaces(lines);
             System.out.println("Interface count: " + interfaces.size());
             interfaceTableDatas.setAll(interfaces);
@@ -514,16 +530,16 @@ public class ConfigGeneralScreen extends VBox {
         sttCol.setCellFactory(col -> new TableCell<NumaHugePageTableData, Number>() {
             @Override
             protected void updateItem(Number item, boolean empty) {
-                super.updateItem(item, empty);
-                if (empty || getTableRow() == null || getTableRow().getItem() == null) {
-                    setText(null);
-                } else {
-                    int rowIndex = getIndex();
-                    int pageIndex = interfacePagination.getCurrentPageIndex();
-                    int offset = pageIndex * 5;
+            super.updateItem(item, empty);
+            if (empty || getTableRow() == null || getTableRow().getItem() == null) {
+                setText(null);
+            } else {
+                int rowIndex = getIndex();
+                int pageIndex = interfacePagination.getCurrentPageIndex();
+                int offset = pageIndex * 5;
 
-                    setText(String.valueOf(offset + rowIndex + 1));
-                }
+                setText(String.valueOf(offset + rowIndex + 1));
+            }
             }
         });
 
@@ -566,11 +582,12 @@ public class ConfigGeneralScreen extends VBox {
                         AlertUtils.showAlert("Lỗi", "Vui lòng chọn hugepages total là 1 số nguyên dương.", "ERROR");
                         return;
                     }
-                    String command = String.format("echo %d > /sys/devices/system/node/%s/hugepages/hugepages-2048kB/nr_hugepages", hugePagesTotalVal, item.getClusterName());
+                    String command = String.format("echo %d > /sys/devices/system/node/%s/hugepages/hugepages-2048kB/nr_hugepages", hugePagesTotalVal, item.getClusterName().toLowerCase());
+                    logger.info("Start update hugePages, command: {}", command);
                     StringBuilder configRssCount = runCommand(command);
                     if(!configRssCount.isEmpty()) {
                         item.hugePagesTotalProperty().setValue(event.getOldValue());
-                        AlertUtils.showAlert(String.format("Cấu hình hugepages cho %s lỗi", item.getClusterName()), configRssCount.toString(), "ERROR");
+                        AlertUtils.showAlertWithTextArea(String.format("Cấu hình hugepages cho %s lỗi", item.getClusterName()), configRssCount.toString(), "ERROR");
                     }
                     else {
                         try {
@@ -643,21 +660,23 @@ public class ConfigGeneralScreen extends VBox {
 
     private List<InterfaceTableData> parseInterfaces(List<String> lines) {
         List<InterfaceTableData> list = new ArrayList<>();
-
+        System.out.println("Start resolve interfaces");
         for (String line : lines) {
             if (line == null || line.isBlank()) continue;
 
-            // Tách theo regex: Name: ... Driver: ... RSS: ... [description]
             Pattern p = Pattern.compile(
-                    "Name:\\s+(\\S+)\\s+Driver:\\s+(\\S+)\\s+RSS:\\s+(\\d+)\\s+\\[(.+)]"
+                "Name:\\s*(\\S*)\\s+Driver:\\s*(\\S*)\\s+RSS:\\s*(\\d*|Unknown)\\s+\\[(.*)]"
             );
+
             Matcher m = p.matcher(line);
+            int rss = -1;
             if (m.find()) {
                 String name = m.group(1);
-                String driver = m.group(2);
-                int rss = Integer.parseInt(m.group(3));
+                String driver = m.group(2).isBlank() ? "Unknown" : m.group(2);
+                if(!m.group(3).equalsIgnoreCase("Unknown")) {
+                    rss = Integer.parseInt(m.group(3));
+                }
                 String description = m.group(4);
-
                 list.add(new InterfaceTableData(name, rss, driver, description));
             }
         }
@@ -666,49 +685,111 @@ public class ConfigGeneralScreen extends VBox {
     }
 
     private Map<String, NumaHugePageTableData> hugePageParser() {
-        String input = """
-            Node 0 HugePages_Total:   256
-            Node 0 HugePages_Free:    256
-            Node 1 HugePages_Total: 10240
-            Node 1 HugePages_Free:   5620
-            Node 2 HugePages_Total:   256
-            Node 2 HugePages_Free:    256
-            Node 3 HugePages_Total:  4196
-            Node 3 HugePages_Free:   2195
-            """;
-
         Map<String, NumaHugePageTableData> result = new HashMap<>();
-        for(String line : input.split("\\n")) {
-            if(line.isBlank()) continue;
-            String[] parts = line.split("\\s+");
-            String clusterName = parts[0] + parts[1];
-            String metric = parts[2].replace(":", "");
-            String value = parts[3];
+        try {
+            String[] commandGetHugePages = {
+                    "/bin/bash", "-c",
+                    "cat /sys/devices/system/node/node*/meminfo | grep -E 'HugePages_Total|HugePages_Free'"
+            };
+            logger.info("Start get HugePages, command: {}", Arrays.toString(commandGetHugePages));
+            Process process = Runtime.getRuntime().exec(commandGetHugePages);
+            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+            CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
+                try {
+                    String line;
+                    while((line = reader.readLine()) != null) {
+                        System.out.println(line);
+                        if(line.isBlank()) continue;
+                        String[] parts = line.split("\\s+");
+                        String clusterName = parts[0] + parts[1];
+                        String metric = parts[2].replace(":", "");
+                        String value = parts[3];
 
-            NumaHugePageTableData numaHugePageTableData = result.computeIfAbsent(clusterName.toLowerCase(), k -> new NumaHugePageTableData(clusterName, "", "", ""));
-            if(metric.equals("HugePages_Total")) {
-                numaHugePageTableData.setHugePagesTotal(value);
-            }
-            else if(metric.equals("HugePages_Free")) {
-                numaHugePageTableData.setHugePagesFree(value);
-            }
+                        NumaHugePageTableData numaHugePageTableData = result.computeIfAbsent(clusterName.toLowerCase(), k -> new NumaHugePageTableData(clusterName, "", "", ""));
+                        if(metric.equals("HugePages_Total")) {
+                            numaHugePageTableData.setHugePagesTotal(value);
+                        }
+                        else if(metric.equals("HugePages_Free")) {
+                            numaHugePageTableData.setHugePagesFree(value);
+                        }
+                    }
+                }
+                catch (Exception e) {
+                    e.printStackTrace();
+                }
+            });
+            future.orTimeout(15, TimeUnit.SECONDS);
+            BufferedReader reader2 = new BufferedReader(new InputStreamReader(process.getErrorStream()));
+
+            CompletableFuture<Void> future2 = CompletableFuture.runAsync(() -> {
+               try {
+                   String error;
+                   while((error = reader2.readLine()) != null) {
+                       logger.error("Get hugePages error: {}", error);
+                   }
+               }
+               catch (Exception e) {
+                   e.printStackTrace();
+               }
+            });
+            future2.orTimeout(10, TimeUnit.SECONDS);
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+            logger.error("Get HugePages error, detail: ", e);
+            AlertUtils.showAlert("Lỗi", e.getMessage(), "ERROR");
+            return new HashMap<>();
         }
 
-        String rssInput = """
-                NUMA node0 CPU(s):                    0-23
-                NUMA node1 CPU(s):                    24-47
-                NUMA node2 CPU(s):                    48-71
-                NUMA node3 CPU(s):                    72-95
-                """;
-        for(String line : rssInput.split("\\n")) {
-            String[] parts = line.split("\\s+");
-            if(line.isBlank() || parts.length < 4) continue;
-            String clusterName = parts[1];
-            String metric = parts[2].replace(":", "");
-            String cpuBinding = parts[3];
+        try {
+            String[] commandGetNuma = {
+                    "/bin/bash", "-c",
+                    "lscpu  | grep NUMA"
+            };
+            System.out.println("Start get Numa");
+            logger.info("Start get numa: {}", Arrays.toString(commandGetNuma));
+            Process process = Runtime.getRuntime().exec(commandGetNuma);
+            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+            CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
+               try {
+                   String line;
+                   while((line = reader.readLine()) != null) {
+                       System.out.println(line);
+                       String[] parts = line.split("\\s+");
+                       if(line.isBlank() || parts.length < 4) continue;
+                       String clusterName = parts[1];
+                       String metric = parts[2].replace(":", "");
+                       String cpuBinding = parts[3];
 
-            NumaHugePageTableData numaHugePageTableData = result.computeIfAbsent(clusterName, k -> new NumaHugePageTableData(clusterName, "", "", ""));
-            numaHugePageTableData.setCpuBinding(cpuBinding);
+                       NumaHugePageTableData numaHugePageTableData = result.computeIfAbsent(clusterName, k -> new NumaHugePageTableData(clusterName, "", "", ""));
+                       numaHugePageTableData.setCpuBinding(cpuBinding);
+                   }
+               }
+               catch (Exception e) {
+                   e.printStackTrace();
+               }
+            });
+            future.orTimeout(15, TimeUnit.SECONDS);
+
+            BufferedReader reader2 = new BufferedReader(new InputStreamReader(process.getErrorStream()));
+            CompletableFuture<Void> future2 = CompletableFuture.runAsync(() -> {
+               try {
+                   String error;
+                   while((error = reader2.readLine()) != null) {
+                       logger.error("Get Numa error: {}", error);
+                   }
+               }
+               catch (Exception e) {
+                   e.printStackTrace();
+               }
+            });
+            future2.orTimeout(10, TimeUnit.SECONDS);
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+            logger.error("Get numa error, detail: ", e);
+            AlertUtils.showAlert("Lỗi", e.getMessage(), "ERROR");
+            return new HashMap<>();
         }
         return result;
     }
@@ -770,24 +851,29 @@ public class ConfigGeneralScreen extends VBox {
     private StringBuilder runCommand(String command) {
         try {
             //  + String.format("ethtool -L %s combined %d '", interfaceName, rssCount)
-            String[] cmd = {"/bin/bash","-c","echo 123456 | sudo -S " + command};
+            // "echo 123456 | sudo -S " +
+            System.out.println("Start update rss for interface: " + command);
+            String[] cmd = {"/bin/bash","-c", command};
+            logger.info("Start run command (update rss): " + Arrays.toString(cmd));
             Process process = Runtime.getRuntime().exec(cmd);
-            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-            String line;
             StringBuilder error = new StringBuilder();
-            while((line = reader.readLine()) != null) {
-                System.out.println(line);
-                if(line.toLowerCase().contains("error")) {
-                    error.append("- ").append(line.split(": ")[1]).append("\n");
-                }
-            }
 
             BufferedReader errorReader = new BufferedReader(new InputStreamReader(process.getErrorStream()));
-            while((line = errorReader.readLine()) != null) {
-                if(line.toLowerCase().contains("error")) {
-                    error.append("- ").append(line.split(": ")[1]).append("\n");
+            CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
+                try {
+                    String line;
+                    while((line = errorReader.readLine()) != null) {
+                        if(line.toLowerCase().contains("error")) {
+                            error.append("- ").append(line.split(": ")[1]).append("\n");
+                        }
+                    }
                 }
-            }
+                catch (Exception e) {
+                    e.printStackTrace();
+                }
+            });
+            future.orTimeout(10, TimeUnit.SECONDS);
+            future.join();
             return error;
         }
         catch (Exception e) {

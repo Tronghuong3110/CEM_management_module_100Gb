@@ -16,12 +16,15 @@ import org.json.JSONObject;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 
 /**
  * @author Trọng Hướng
  */
 public class ScreenNavigator {
     private static BorderPane root;
+    private static ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
     public static void initScreen(BorderPane rootPane) {
         root = rootPane;
@@ -71,6 +74,7 @@ public class ScreenNavigator {
             Platform.runLater(() -> {
                 ConfigGeneralScreen s = new ConfigGeneralScreen();
                 s.showTable();
+                scheduler.shutdown();
                 ScreenNavigator.navigateTo(s);
             });
         }));
@@ -79,11 +83,16 @@ public class ScreenNavigator {
             Platform.runLater(() -> {
                 ConfigRunModuleScreen s = new ConfigRunModuleScreen(null);
                 s.showTable();
+                if(scheduler.isShutdown()) {
+                    scheduler = Executors.newScheduledThreadPool(1);
+                }
+                s.setScheduler(scheduler);
                 ScreenNavigator.navigateTo(s);
             });
         }));
         items.add(createSidebarItem("About", 30, 30, "/com/module_service_insert/icons/about.png", () -> {
             ScreenNavigator.showLoading();
+            scheduler.shutdown();
             AboutScreen about = new AboutScreen();
             Task<JSONObject> task = new Task<JSONObject>() {
                 @Override

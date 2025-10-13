@@ -16,7 +16,7 @@ public class ButtonUtil {
         Image icon = new Image(Objects.requireNonNull(ConfigRunModuleScreen.class.getResourceAsStream(iconPath)));
         ImageView iconView = new ImageView(icon);
         iconView.setFitWidth(16);
-        iconView.setFitHeight(16);
+        iconView.setPreserveRatio(true);
         Button button = new Button(label, iconView);
         return button;
     }

@@ -9,12 +9,14 @@ import java.util.List;
 public class ConfigModel {
     private Long id;
     private String name;
+    private String path;
     private List<ConfigClusterModuleModel> moduleConfigs;
 
     public ConfigModel() {}
 
-    public ConfigModel(String name) {
+    public ConfigModel(String name, String path) {
         moduleConfigs = new ArrayList<>();
+        this.path = path;
         this.name = name;
     }
 
@@ -32,5 +34,13 @@ public class ConfigModel {
 
     public void setName(String name) {
         this.name = name;
+    }
+
+    public String getPath() {
+        return path;
+    }
+
+    public void setPath(String path) {
+        this.path = path;
     }
 }

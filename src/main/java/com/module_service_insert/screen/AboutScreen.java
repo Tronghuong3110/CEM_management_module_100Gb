@@ -21,6 +21,8 @@ import javafx.stage.FileChooser;
 import javafx.stage.StageStyle;
 import javafx.stage.Window;
 import org.json.JSONObject;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -40,6 +42,8 @@ import java.util.concurrent.CompletableFuture;
  * @author Trọng Hướng
  */
 public class AboutScreen extends StackPane {
+
+    private final Logger logger = LoggerFactory.getLogger(AboutScreen.class);
 
     private VBox container;
     private StackPane overLay;
@@ -104,7 +108,7 @@ public class AboutScreen extends StackPane {
         statusLabel   = createLabelWithIcon("Trạng thái", "/com/module_service_insert/icons/status_fail.png");
         Label failureCauseLabel     = createLabelWithIcon("Mã lỗi", "/com/module_service_insert/icons/type.png");
         Label licenseNameLabel     = createLabelWithIcon("Tên license", "/com/module_service_insert/icons/user_use.png");
-        Label locationLabel = createLabelWithIcon("Vị trí license", "/com/module_service_insert/icons/folder.png");
+//        Label locationLabel = createLabelWithIcon("Vị trí license", "/com/module_service_insert/icons/folder.png");
         Label expiryLabel   = createLabelWithIcon("Thời gian license", "/com/module_service_insert/icons/expiry.png");
 
         String valueStyle = "-fx-font-size: 18px;";
@@ -119,8 +123,8 @@ public class AboutScreen extends StackPane {
         grid.addRow(1, statusLabel, statusVal);
         grid.addRow(2, failureCauseLabel, failureCauseVal);
         grid.addRow(3, licenseNameLabel, licenseNameVal);
-        grid.addRow(4, locationLabel, locationVal);
-        grid.addRow(5, expiryLabel, expiryVal);
+//        grid.addRow(4, locationLabel, locationVal);
+        grid.addRow(4, expiryLabel, expiryVal);
 
         ColumnConstraints col1 = new ColumnConstraints();
         col1.setPercentWidth(35);
@@ -278,10 +282,9 @@ public class AboutScreen extends StackPane {
 
     public JSONObject checkStatusLicense(String licensePath) {
         if(licensePath == null || licensePath.isBlank()) {
-            String folderLicense = VariableCommon.LICENSE_CHECK_MODULE_PATH;
+            String folderLicense = VariableCommon.LICENSE_CHECK_MODULE_PATH; // đường dẫn tới folder chưa các file license
             File folder = new File(folderLicense);
             File[] filesLicense = folder.listFiles((dir, filename) -> filename.endsWith(".lic"));
-//            File[] filesLicense = folder.listFiles((dir, filename) -> filename.endsWith(".txt"));
             if(filesLicense != null && filesLicense.length > 0) {
                 File newest = Arrays.stream(filesLicense)
                         .max(Comparator.comparingLong(File::lastModified))
@@ -290,7 +293,11 @@ public class AboutScreen extends StackPane {
             }
         }
         try {
-            String command = VariableCommon.LICENSE_CHECK_MODULE_NAME;
+//            String command = VariableCommon.LICENSE_CHECK_MODULE_PATH + "/" + VariableCommon.LICENSE_CHECK_MODULE_NAME + " -e"; // tên module chạy check license
+            String[] command = {"/bin/bash", "-c",
+                    "echo '123456' | sudo -S " + VariableCommon.LICENSE_CHECK_MODULE_PATH + "/" + VariableCommon.LICENSE_CHECK_MODULE_NAME + " -e"
+            };
+            logger.info("Start check license, command: " + Arrays.toString(command));
             Process processCheckLicense = Runtime.getRuntime().exec(command);
             BufferedReader output = new BufferedReader(new InputStreamReader(processCheckLicense.getInputStream()));
             String line;
@@ -332,6 +339,7 @@ public class AboutScreen extends StackPane {
         }
         catch (Exception e) {
             e.printStackTrace();
+            logger.error("Check license error, details: ", e);
             throw new RuntimeException(e);
         }
     }

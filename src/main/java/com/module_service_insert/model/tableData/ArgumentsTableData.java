@@ -3,6 +3,7 @@ package com.module_service_insert.model.tableData;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.beans.property.StringProperty;
 
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -16,7 +17,7 @@ public class ArgumentsTableData {
     private final StringProperty output = new SimpleStringProperty();
     private final StringProperty thread = new SimpleStringProperty();
     private final StringProperty ativeWait = new SimpleStringProperty();
-
+    private final Map<String, String> argsMap = new HashMap<>();
     public ArgumentsTableData() {}
 
     public ArgumentsTableData(String queue, String cpuBinding, String output, String thread, String ativeWait) {
@@ -44,7 +45,7 @@ public class ArgumentsTableData {
     public String getOutput() {return this.output.get();}
     public String getThread() {return this.thread.get();}
     public String getativeWait() {return this.ativeWait.get();}
-
+    public void setArgsMap(Map<String, String> argsMap) {this.argsMap.putAll(argsMap);}
     // -q queue, -g cpu binding, -o output, -l thread, -a ative wait
     public String getArgsAsString() {
         return String.format("queue=%s, cpu binding=%s, output=%s, thread=%s, active wait=%s",
@@ -52,12 +53,15 @@ public class ArgumentsTableData {
     }
 
     public Map<String, String> getArgsMap() {
-        Map<String, String> map = new LinkedHashMap<>();
-        map.put("queue", queue.get());
-        map.put("cpu binding", cpuBinding.get());
-        map.put("output", output.get());
-        map.put("thread", thread.get());
-        map.put("active wait", ativeWait.get());
-        return map;
+        if(this.argsMap.isEmpty()) {
+            Map<String, String> map = new LinkedHashMap<>();
+            map.put("queue", queue.get());
+            map.put("cpu binding", cpuBinding.get());
+            map.put("output", output.get());
+            map.put("thread", thread.get());
+            map.put("active wait", ativeWait.get());
+            return map;
+        }
+        return this.argsMap;
     }
 }

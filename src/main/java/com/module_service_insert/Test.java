@@ -1,5 +1,7 @@
 package com.module_service_insert;
 
+import org.json.JSONObject;
+
 import java.io.IOException;
 
 /**
@@ -7,8 +9,14 @@ import java.io.IOException;
  */
 public class Test {
     public static void main(String[] args) throws IOException {
-        String command = "cmd.exe /c start "+"ping -t 8.8.8.8";
-        Runtime rt = Runtime.getRuntime();
-        rt.exec(command);
+        while(true) {
+            try {
+                Thread.sleep(5000);
+                System.out.println("Hello World");
+            }
+            catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
     }
 }

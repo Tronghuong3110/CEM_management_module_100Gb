@@ -32,7 +32,7 @@ public class ModuleInsertApplication extends Application {
             ScreenNavigator.navigateTo(managerNodeAndModuleScreen);
         });
 
-        Scene scene = new Scene(root, 1150, 800);
+        Scene scene = new Scene(root, 1140, 800);
         stage.setTitle("Ứng dụng quản lý module");
         stage.setScene(scene);
         stage.setResizable(false);
@@ -45,42 +45,52 @@ public class ModuleInsertApplication extends Application {
     }
 
     public static void main(String[] args) {
-//        for(int i = 0; i < args.length; i++) {
-//            if(args[i].equalsIgnoreCase("--config") || args[i].equalsIgnoreCase("-c")) {
-//                VariableCommon.CONFIG_PATH = args[i + 1];
-//            }
-//        }
-        VariableCommon.LICENSE_CHECK_MODULE_PATH = "D:\\license";
-        VariableCommon.LICENSE_CHECK_MODULE_NAME = "python -u D:\\license\\check_license.py ";
+        for(int i = 0; i < args.length; i++) {
+            if(args[i].equalsIgnoreCase("--config") || args[i].equalsIgnoreCase("-c")) {
+                VariableCommon.CONFIG_PATH = args[i + 1];
+            }
+        }
+//        VariableCommon.LICENSE_CHECK_MODULE_PATH = "D:\\license";
+//        VariableCommon.LICENSE_CHECK_MODULE_NAME = "python -u D:\\license\\check_license.py ";
         ScheduledExecutorService schedule = Executors.newScheduledThreadPool(1);
-//        schedule.scheduleAtFixedRate(() -> {
-//            File configFile = new File(VariableCommon.CONFIG_PATH);
-//            if(!configFile.exists()) {
-//                System.out.println("Config file doesn't exist");
-//            }
-//            else {
-//                try (BufferedReader br = new BufferedReader(new FileReader(configFile))) {
-//                    String line;
-//                    while ((line = br.readLine()) != null) {
-//                        if(line.startsWith("#") || line.isBlank()) continue;
-//                        String[] parts = line.split("=");
-//                        if(line.startsWith("check_license_path")) {
-//                            if(VariableCommon.LICENSE_CHECK_MODULE_PATH == null || !VariableCommon.LICENSE_CHECK_MODULE_PATH.equalsIgnoreCase(parts[1])) {
-//                                VariableCommon.LICENSE_CHECK_MODULE_PATH = parts[1];
-//                            }
-//                        }
-//                        if(line.startsWith("check_license_name")) {
-//                            if(VariableCommon.LICENSE_CHECK_MODULE_NAME == null || !VariableCommon.LICENSE_CHECK_MODULE_NAME.equalsIgnoreCase(parts[1])) {
-//                                VariableCommon.LICENSE_CHECK_MODULE_NAME = parts[1];
-//                            }
-//                        }
-//                    }
-//                }
-//                catch (IOException e) {
-//                    e.printStackTrace();
-//                }
-//            }
-//        }, 0, 10, TimeUnit.MINUTES);
+        schedule.scheduleAtFixedRate(() -> {
+            File configFile = new File(VariableCommon.CONFIG_PATH);
+            if(!configFile.exists()) {
+                System.out.println("Config file doesn't exist");
+            }
+            else {
+                try (BufferedReader br = new BufferedReader(new FileReader(configFile))) {
+                    String line;
+                    while ((line = br.readLine()) != null) {
+                        if(line.startsWith("#") || line.isBlank()) continue;
+                        String[] parts = line.split("=");
+                        if(line.startsWith("check_license_path")) { // đường dẫn tới folder chứa danh sách các file license
+                            if(VariableCommon.LICENSE_CHECK_MODULE_PATH == null || !VariableCommon.LICENSE_CHECK_MODULE_PATH.equalsIgnoreCase(parts[1])) {
+                                VariableCommon.LICENSE_CHECK_MODULE_PATH = parts[1];
+                            }
+                        }
+                        if(line.startsWith("check_license_name")) { // tên module chạy check license
+                            if(VariableCommon.LICENSE_CHECK_MODULE_NAME == null || !VariableCommon.LICENSE_CHECK_MODULE_NAME.equalsIgnoreCase(parts[1])) {
+                                VariableCommon.LICENSE_CHECK_MODULE_NAME = parts[1];
+                            }
+                        }
+                        if(line.startsWith("config_directory_path")) {
+                            if(VariableCommon.CONFIG_DIRECTORY_PATH == null || !VariableCommon.CONFIG_DIRECTORY_PATH.equalsIgnoreCase(parts[1])) {
+                                VariableCommon.CONFIG_DIRECTORY_PATH = parts[1];
+                            }
+                        }
+                        if(line.startsWith("active_config_directory_path")) {
+                            if(VariableCommon.ACTIVE_CONFIG_DIRECTORY_PATH == null || !VariableCommon.ACTIVE_CONFIG_DIRECTORY_PATH.equalsIgnoreCase(parts[1])) {
+                                VariableCommon.ACTIVE_CONFIG_DIRECTORY_PATH = parts[1];
+                            }
+                        }
+                    }
+                }
+                catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }, 0, 10, TimeUnit.MINUTES);
         launch();
     }
 }

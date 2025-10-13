@@ -12,4 +12,6 @@ public class VariableCommon {
     public static String LICENSE_CHECK_MODULE_PATH = null;
     public static String CONFIG_PATH = null;
     public static String LICENSE_CHECK_MODULE_NAME = null;
+    public static String CONFIG_DIRECTORY_PATH = null;
+    public static String ACTIVE_CONFIG_DIRECTORY_PATH = null;
 }
