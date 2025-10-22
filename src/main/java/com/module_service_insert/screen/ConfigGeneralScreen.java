@@ -402,7 +402,7 @@ public class ConfigGeneralScreen extends VBox {
             List<String> lines = new ArrayList<>();
             try {
                 System.out.println("Start get list interfaces");
-                String commandShowInterface = "pf_ringcfg --list-interfaces";
+                String commandShowInterface = "sudo pf_ringcfg --list-interfaces";
                 Process process = Runtime.getRuntime().exec(commandShowInterface);
                 BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
                 String line;
@@ -687,110 +687,81 @@ public class ConfigGeneralScreen extends VBox {
     private Map<String, NumaHugePageTableData> hugePageParser() {
         Map<String, NumaHugePageTableData> result = new HashMap<>();
         try {
+            // === Lấy hugePages ===
             String[] commandGetHugePages = {
                     "/bin/bash", "-c",
                     "cat /sys/devices/system/node/node*/meminfo | grep -E 'HugePages_Total|HugePages_Free'"
             };
             logger.info("Start get HugePages, command: {}", Arrays.toString(commandGetHugePages));
             Process process = Runtime.getRuntime().exec(commandGetHugePages);
-            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-            CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
-                try {
-                    String line;
-                    while((line = reader.readLine()) != null) {
-                        System.out.println(line);
-                        if(line.isBlank()) continue;
-                        String[] parts = line.split("\\s+");
-                        String clusterName = parts[0] + parts[1];
-                        String metric = parts[2].replace(":", "");
-                        String value = parts[3];
 
-                        NumaHugePageTableData numaHugePageTableData = result.computeIfAbsent(clusterName.toLowerCase(), k -> new NumaHugePageTableData(clusterName, "", "", ""));
-                        if(metric.equals("HugePages_Total")) {
-                            numaHugePageTableData.setHugePagesTotal(value);
-                        }
-                        else if(metric.equals("HugePages_Free")) {
-                            numaHugePageTableData.setHugePagesFree(value);
-                        }
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+                 BufferedReader errReader = new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
+
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    if (line.isBlank()) continue;
+                    // Ví dụ: Node 0 HugePages_Total: 512
+                    String[] parts = line.trim().split("\\s+");
+                    if (parts.length < 4) continue;
+
+                    String clusterName = parts[0].toLowerCase() + parts[1]; // node0, node1...
+                    String metric = parts[2].replace(":", "");
+                    String value = parts[3];
+
+                    NumaHugePageTableData data = result.computeIfAbsent(clusterName,
+                            k -> new NumaHugePageTableData(clusterName, "", "", ""));
+                    if ("HugePages_Total".equals(metric)) {
+                        data.setHugePagesTotal(value);
+                    } else if ("HugePages_Free".equals(metric)) {
+                        data.setHugePagesFree(value);
                     }
                 }
-                catch (Exception e) {
-                    e.printStackTrace();
+
+                // Đọc lỗi nếu có
+                String errorLine;
+                while ((errorLine = errReader.readLine()) != null) {
+                    logger.error("Get HugePages error: {}", errorLine);
                 }
-            });
-            future.orTimeout(15, TimeUnit.SECONDS);
-            BufferedReader reader2 = new BufferedReader(new InputStreamReader(process.getErrorStream()));
 
-            CompletableFuture<Void> future2 = CompletableFuture.runAsync(() -> {
-               try {
-                   String error;
-                   while((error = reader2.readLine()) != null) {
-                       logger.error("Get hugePages error: {}", error);
-                   }
-               }
-               catch (Exception e) {
-                   e.printStackTrace();
-               }
-            });
-            future2.orTimeout(10, TimeUnit.SECONDS);
-        }
-        catch (Exception e) {
-            e.printStackTrace();
-            logger.error("Get HugePages error, detail: ", e);
+                process.waitFor(10, TimeUnit.SECONDS);
+            }
+
+            // === Lấy NUMA ===
+            String[] commandGetNuma = {"/bin/bash", "-c", "lscpu | grep NUMA"};
+            logger.info("Start get NUMA, command: {}", Arrays.toString(commandGetNuma));
+            Process process2 = Runtime.getRuntime().exec(commandGetNuma);
+
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process2.getInputStream()));
+                 BufferedReader errReader = new BufferedReader(new InputStreamReader(process2.getErrorStream()))) {
+
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    if (line.isBlank()) continue;
+                    String[] parts = line.trim().split("\\s+");
+                    if (parts.length < 4) continue;
+
+                    String clusterName = parts[1].toLowerCase();
+                    String cpuBinding = parts[3];
+
+                    NumaHugePageTableData data = result.computeIfAbsent(clusterName,
+                            k -> new NumaHugePageTableData(clusterName, "", "", ""));
+                    data.setCpuBinding(cpuBinding);
+                }
+
+                String errorLine;
+                while ((errorLine = errReader.readLine()) != null) {
+                    logger.error("Get NUMA error: {}", errorLine);
+                }
+
+                process2.waitFor(10, TimeUnit.SECONDS);
+            }
+        } catch (Exception e) {
+            logger.error("Get HugePages/NUMA error", e);
             AlertUtils.showAlert("Lỗi", e.getMessage(), "ERROR");
             return new HashMap<>();
         }
 
-        try {
-            String[] commandGetNuma = {
-                    "/bin/bash", "-c",
-                    "lscpu  | grep NUMA"
-            };
-            System.out.println("Start get Numa");
-            logger.info("Start get numa: {}", Arrays.toString(commandGetNuma));
-            Process process = Runtime.getRuntime().exec(commandGetNuma);
-            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-            CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
-               try {
-                   String line;
-                   while((line = reader.readLine()) != null) {
-                       System.out.println(line);
-                       String[] parts = line.split("\\s+");
-                       if(line.isBlank() || parts.length < 4) continue;
-                       String clusterName = parts[1];
-                       String metric = parts[2].replace(":", "");
-                       String cpuBinding = parts[3];
-
-                       NumaHugePageTableData numaHugePageTableData = result.computeIfAbsent(clusterName, k -> new NumaHugePageTableData(clusterName, "", "", ""));
-                       numaHugePageTableData.setCpuBinding(cpuBinding);
-                   }
-               }
-               catch (Exception e) {
-                   e.printStackTrace();
-               }
-            });
-            future.orTimeout(15, TimeUnit.SECONDS);
-
-            BufferedReader reader2 = new BufferedReader(new InputStreamReader(process.getErrorStream()));
-            CompletableFuture<Void> future2 = CompletableFuture.runAsync(() -> {
-               try {
-                   String error;
-                   while((error = reader2.readLine()) != null) {
-                       logger.error("Get Numa error: {}", error);
-                   }
-               }
-               catch (Exception e) {
-                   e.printStackTrace();
-               }
-            });
-            future2.orTimeout(10, TimeUnit.SECONDS);
-        }
-        catch (Exception e) {
-            e.printStackTrace();
-            logger.error("Get numa error, detail: ", e);
-            AlertUtils.showAlert("Lỗi", e.getMessage(), "ERROR");
-            return new HashMap<>();
-        }
         return result;
     }
 

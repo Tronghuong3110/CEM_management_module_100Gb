@@ -14,4 +14,6 @@ public class VariableCommon {
     public static String LICENSE_CHECK_MODULE_NAME = null;
     public static String CONFIG_DIRECTORY_PATH = null;
     public static String ACTIVE_CONFIG_DIRECTORY_PATH = null;
+    public static String LOG_FOLDER = null;
+    public static String MODULE_NAME_PATH = null;
 }

@@ -26,6 +26,7 @@ public class ConfigRunModuleTableData {
         this.status.setValue(status);
         this.command.setValue(command);
         this.interfaceName.setValue(interfaceName);
+        this.argumentsTableData = new ArgumentsTableData();
     }
 
     public StringProperty moduleNameProperty() {return moduleName;}

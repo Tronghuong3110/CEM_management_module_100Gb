@@ -84,6 +84,16 @@ public class ModuleInsertApplication extends Application {
                                 VariableCommon.ACTIVE_CONFIG_DIRECTORY_PATH = parts[1];
                             }
                         }
+                        if(line.startsWith("folder_log")) {
+                            if(VariableCommon.LOG_FOLDER == null || !VariableCommon.LOG_FOLDER.equalsIgnoreCase(parts[1])) {
+                                VariableCommon.LOG_FOLDER = parts[1];
+                            }
+                        }
+                        if(line.startsWith("module_name_path")) {
+                            if(VariableCommon.MODULE_NAME_PATH == null || !VariableCommon.MODULE_NAME_PATH.equalsIgnoreCase(parts[1])) {
+                                VariableCommon.MODULE_NAME_PATH = parts[1];
+                            }
+                        }
                     }
                 }
                 catch (IOException e) {
