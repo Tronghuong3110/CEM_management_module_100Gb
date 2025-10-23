@@ -10,6 +10,7 @@ import com.module_service_insert.model.tableData.ConfigRunModuleTableData;
 import com.module_service_insert.presenter.ConfigPresenter;
 import com.module_service_insert.utils.functionUtils.AlertUtils;
 import com.module_service_insert.utils.functionUtils.ChooseLocationFile;
+import com.module_service_insert.utils.functionUtils.FileUtils;
 import com.module_service_insert.utils.functionUtils.NormalizeString;
 import com.module_service_insert.utils.screenUtils.*;
 import javafx.application.Platform;
@@ -67,6 +68,7 @@ public class ConfigRunModuleScreen extends VBox {
     private ObservableList<ConfigRunModuleTableData> filterConfigRunModuleTableDatas = FXCollections.observableArrayList();
 
     private TextField tfModuleName;
+    private TextField tfInterfaceName;
     private ComboBox<String> cbStatus;
     private ComboBox<ConfigModel> cbConfigByName;
 
@@ -125,42 +127,50 @@ public class ConfigRunModuleScreen extends VBox {
 
     private void createConfigTable() {
         configRunModuleTable = new TableView<>();
+        configRunModuleTable.setColumnResizePolicy(TableView.UNCONSTRAINED_RESIZE_POLICY);
+
+        // ==== Khai báo các cột ====
         TableColumn<ConfigRunModuleTableData, Boolean> selectCol = new TableColumn<>("");
-        TableColumn<ConfigRunModuleTableData, String> moduleNameCol = CreateColumnTableUtil.createColumn("Module name", ConfigRunModuleTableData::moduleNameProperty);
-        TableColumn<ConfigRunModuleTableData, String> commandCol = CreateColumnTableUtil.createColumn("Command", ConfigRunModuleTableData::commandProperty);
-        TableColumn<ConfigRunModuleTableData, String> statusCol = CreateColumnTableUtil.createColumn("Status", ConfigRunModuleTableData::statusProperty);
-        TableColumn<ConfigRunModuleTableData, String> interfaceNameCol = CreateColumnTableUtil.createColumn("Interface name", ConfigRunModuleTableData::interfaceNameProperty);
+        TableColumn<ConfigRunModuleTableData, String> moduleNameCol =
+                CreateColumnTableUtil.createColumn("Module name", ConfigRunModuleTableData::moduleNameProperty);
+        TableColumn<ConfigRunModuleTableData, String> commandCol =
+                CreateColumnTableUtil.createColumn("Command", ConfigRunModuleTableData::commandProperty);
+        TableColumn<ConfigRunModuleTableData, String> statusCol =
+                CreateColumnTableUtil.createColumn("Status", ConfigRunModuleTableData::statusProperty);
+        TableColumn<ConfigRunModuleTableData, String> interfaceNameCol =
+                CreateColumnTableUtil.createColumn("Interface name", ConfigRunModuleTableData::interfaceNameProperty);
         TableColumn<ConfigRunModuleTableData, Void> actionColumn = new TableColumn<>("Action");
 
+        // ==== Cài đặt tỷ lệ chiều rộng theo phần trăm ====
         setColumnPercentWidth(selectCol, 5);
         setColumnPercentWidth(moduleNameCol, 20);
         setColumnPercentWidth(statusCol, 8);
         setColumnPercentWidth(commandCol, 30);
         setColumnPercentWidth(interfaceNameCol, 20);
-        setColumnPercentWidth(actionColumn, 17);
 
-        configRunModuleTable.getColumns().addAll(selectCol, moduleNameCol, statusCol, commandCol, interfaceNameCol, actionColumn);
+        configRunModuleTable.getColumns().addAll(
+                selectCol, moduleNameCol, statusCol, commandCol, interfaceNameCol, actionColumn
+        );
 
+        // ==== Cấu hình chung ====
         configRunModuleTable.setItems(filterConfigRunModuleTableDatas);
         configRunModuleTable.setPrefHeight(600);
         configRunModuleTable.setMaxHeight(300);
         configRunModuleTable.setStyle("-fx-background-color: #f0f0f0; -fx-border-color: #cccccc; -fx-border-width: 1px;");
-
         configRunModuleTable.getStylesheets().add(
-                Objects.requireNonNull(
-                        getClass().getResource("/com/module_service_insert/css/table_row.css")
-                ).toExternalForm()
+                Objects.requireNonNull(getClass().getResource("/com/module_service_insert/css/table_row.css")).toExternalForm()
         );
 
+        // ==== Cột Status (biểu tượng tròn) ====
         statusCol.setCellFactory(col -> new TableCell<>() {
             private final Circle circle = new Circle(8);
             {
                 setAlignment(Pos.CENTER);
             }
+
             @Override
             protected void updateItem(String status, boolean empty) {
                 super.updateItem(status, empty);
-
                 if (empty || status == null) {
                     setGraphic(null);
                 } else {
@@ -176,41 +186,36 @@ public class ConfigRunModuleScreen extends VBox {
             }
         });
 
+        // ==== Cột checkbox chọn ====
         CheckBox selectAllCheckBox = new CheckBox();
         selectCol.setGraphic(selectAllCheckBox);
         selectCol.setEditable(true);
-
         selectCol.setCellValueFactory(cellData -> cellData.getValue().selectedProperty());
         selectCol.setCellFactory(CheckBoxTableCell.forTableColumn(selectCol));
 
         selectAllCheckBox.selectedProperty().addListener((obs, oldVal, newVal) -> {
             for (ConfigRunModuleTableData item : configRunModuleTable.getItems()) {
                 item.setSelected(newVal);
-                if(newVal) {
-                    configRunModuleChecked.add(item);
-                }
-                else {
-                    configRunModuleChecked.remove(item);
-                }
+                if (newVal) configRunModuleChecked.add(item);
+                else configRunModuleChecked.remove(item);
             }
         });
 
+        // ==== Style cho hàng ====
         configRunModuleTable.setRowFactory(tv -> {
             TableRow<ConfigRunModuleTableData> row = new TableRow<>() {
                 @Override
                 protected void updateItem(ConfigRunModuleTableData item, boolean empty) {
-                super.updateItem(item, empty);
-                if (empty || item == null) {
-                    setStyle("");
-                } else if (isSelected()) {
-                    setStyle("-fx-background-color: #2f7a9a; -fx-text-fill: white;");
-                } else {
-                    if (getIndex() % 2 == 0) {
-                        setStyle("-fx-background-color: #ffffff;");
+                    super.updateItem(item, empty);
+                    if (empty || item == null) {
+                        setStyle("");
+                    } else if (isSelected()) {
+                        setStyle("-fx-background-color: #2f7a9a; -fx-text-fill: white;");
                     } else {
-                        setStyle("-fx-background-color: #f1f1f1f1;");
+                        setStyle(getIndex() % 2 == 0
+                                ? "-fx-background-color: #ffffff;"
+                                : "-fx-background-color: #f1f1f1;");
                     }
-                }
                 }
             };
 
@@ -218,77 +223,55 @@ public class ConfigRunModuleScreen extends VBox {
                 if (!row.isEmpty()) {
                     ConfigRunModuleTableData item = row.getItem();
                     item.setSelected(!item.isSelected());
-                    if(item.isSelected()){
-                        configRunModuleChecked.add(item);
-                    }
-                    else {
-                        configRunModuleChecked.remove(item);
-                    }
-                    argTitle.setText(String.format("Các tham số đầu vào của module %s với interface %s", item.getModuleName(), item.getInterfaceName()));
-//                    argTitle.setText("Các tham số đầu vào của module: " + item.getModuleName());
-                    Map<String, String> args = item.getArgs().getArgsMap();
-                    for(Map.Entry<String, String> entry : args.entrySet()) {
-                        System.out.println(entry.getKey() + "-" + entry.getValue());
-                        Label arglabel = valueArgsMap.get(entry.getKey());
-                        arglabel.setText(entry.getValue());
+                    if (item.isSelected()) configRunModuleChecked.add(item);
+                    else configRunModuleChecked.remove(item);
+
+                    argTitle.setText(String.format(
+                            "Các tham số đầu vào của module %s với interface %s",
+                            item.getModuleName(), item.getInterfaceName())
+                    );
+                    Map<String, Object> args = item.getArgsMap();
+                    for (Map.Entry<String, Object> entry : args.entrySet()) {
+                        Label argLabel = valueArgsMap.get(entry.getKey());
+                        if (argLabel != null)
+                            argLabel.setText(String.valueOf(entry.getValue()));
                     }
                 }
             });
-
-            row.selectedProperty().addListener((obs, wasSelected, isNowSelected) -> {
-                ConfigRunModuleTableData item = row.getItem();
-                if (item != null) {
-                    if (isNowSelected) {
-                        row.setStyle("-fx-background-color: #2f7a9a; -fx-text-fill: white;");
-                    } else {
-                        if (row.getIndex() % 2 == 0) {
-                            row.setStyle("-fx-background-color: #ffffff;");
-                        } else {
-                            row.setStyle("-fx-background-color: #e0f2f7;");
-                        }
-                    }
-                }
-            });
-
             return row;
         });
+
         actionColumn.setCellFactory(col -> new TableCell<>() {
-            private final Button startBtn = createIconButton("/com/module_service_insert/icons/play.png", 20, 20);
-            private final Button stopBtn = createIconButton("/com/module_service_insert/icons/stop.png", 20, 20);
-            private final Button editBtn = createIconButton("/com/module_service_insert/icons/pencil.png", 20, 20);
-            private final Button deleteBtn = createIconButton("/com/module_service_insert/icons/delete.png", 20, 20);
+            private final Button startBtn = ButtonUtil.createBtn("/com/module_service_insert/icons/play.png", 20, 20);
+            private final Button stopBtn = ButtonUtil.createBtn("/com/module_service_insert/icons/stop.png", 20, 20);
+            private final Button editBtn = ButtonUtil.createBtn("/com/module_service_insert/icons/pencil.png", 20, 20);
+            private final Button deleteBtn = ButtonUtil.createBtn("/com/module_service_insert/icons/delete.png", 20, 20);
             private final HBox btnBox = new HBox(5, startBtn, stopBtn, editBtn, deleteBtn);
             {
                 btnBox.setAlignment(Pos.CENTER);
                 startBtn.setOnAction(e -> {
-                    overLay.setVisible(true);
                     ConfigRunModuleTableData item = getTableView().getItems().get(getIndex());
+                    overLay.setVisible(true);
                     CompletableFuture.supplyAsync(() -> {
                         try {
-                            return startModule(item.getCommand(), item.getModuleName(), item.getInterfaceName(), item.getArgs().getArgsAsString());
-                        }
-                        catch (RunException ex) {
+                            return startModule(item.getCommand(), item.getModuleName(), item.getInterfaceName(), item.getArgsAsString());
+                        } catch (RunException ex) {
                             throw ex;
                         }
                     })
-                    .thenAccept(message -> {
+                    .thenAccept(message ->
                         Platform.runLater(() -> {
-                            if(message.isEmpty()) {
+                            if (message.isEmpty()) {
                                 item.setStatus("active");
-                                System.out.println("Chạy module thành công.");
                                 AlertUtils.showAlert("Thành công", "Chạy module: " + item.getModuleName() + " thành công.", "INFORMATION");
-                            }
-                            else {
-                                item.setStatus("error");
-                                AlertUtils.showAlertWithTextArea("Lỗi", message.toString(), "ERROR");
+                            } else {
+                                item.setStatus("error"); AlertUtils.showAlertWithTextArea("Lỗi", message.toString(), "ERROR");
                             }
                             overLay.setVisible(false);
-                        });
-                    })
+                        }))
                     .exceptionally(ex -> {
                         Platform.runLater(() -> {
-                            item.setStatus("error");
-                            AlertUtils.showAlert("Lỗi", ex.getMessage(), "ERROR");
+                            item.setStatus("error"); AlertUtils.showAlert("Lỗi", ex.getMessage(), "ERROR");
                             overLay.setVisible(false);
                         });
                         return null;
@@ -296,40 +279,31 @@ public class ConfigRunModuleScreen extends VBox {
                 });
                 stopBtn.setOnAction(e -> {
                     ConfigRunModuleTableData item = getTableView().getItems().get(getIndex());
-                    overLay.setVisible(true);
                     boolean isConfirm = AlertUtils.confirm("Xác nhận dừng module", "Bạn chắc chắn muốn dừng module " + item.getModuleName() + "-" + item.getInterfaceName() + " không?");
                     if (isConfirm) {
+                        overLay.setVisible(true);
                         CompletableFuture.supplyAsync(() -> {
                             try {
                                 return killProcess(item);
-                            }
-                            catch (RunException ex) {
+                            } catch (RunException ex) {
                                 throw ex;
                             }
-                        })
-                        .thenAccept(message -> {
-                            Platform.runLater(() -> {
-                                overLay.setVisible(false);
-                                if(message.isEmpty()) {
+                        }).thenAccept(message -> Platform.runLater(() -> {
+                            overLay.setVisible(false);
+                            if (message.isEmpty()) {
+                                item.setStatus("inactive");
+                                AlertUtils.showAlert("Thành công", "Dừng module " + item.getModuleName() + " thành công.", "INFORMATION");
+                            } else {
+                                AlertUtils.showAlert("Thất bại", "Dừng module " + item.getModuleName() + " thất bại.", "ERROR");
+                                if (!isProcessRunning(item.getCommand(), item.getInterfaceName(), item.getArgsAsString())) {
                                     item.setStatus("inactive");
-                                    AlertUtils.showAlert("Thành công", "Dừng module " + item.getModuleName() + " thành công.", "INFORMATION");
                                 }
-                                else {
-                                    AlertUtils.showAlert("Thất bại", "Dừng module " + item.getModuleName() + " thất bại.", "ERROR");
-                                    boolean isModuleRunning = isProcessRunning(item.getCommand(), item.getInterfaceName(), item.getArgs().getArgsAsString());
-                                    if(!isModuleRunning) {
-                                        item.setStatus("inactive");
-                                    }
-                                }
-                            });
-                        })
-                        .exceptionally(ex -> {
+                            }
+                        })).exceptionally(ex -> {
                             Platform.runLater(() -> {
                                 overLay.setVisible(false);
                                 AlertUtils.showAlert("Lỗi", ex.getMessage(), "ERROR");
-                                // Dừng module lỗi ==> có cần check lại xem module có đang chạy nữa không
-                                boolean isModuleRunning = isProcessRunning(item.getCommand(), item.getInterfaceName(), item.getArgs().getArgsAsString());
-                                if(!isModuleRunning){
+                                if (!isProcessRunning(item.getCommand(), item.getInterfaceName(), item.getArgsAsString())) {
                                     item.setStatus("inactive");
                                 }
                             });
@@ -337,52 +311,49 @@ public class ConfigRunModuleScreen extends VBox {
                         });
                     }
                 });
-
                 editBtn.setOnAction(e -> {
-                   ConfigRunModuleTableData item = getTableView().getItems().get(getIndex());
-                   createFormAddNewOrEdit(item);
+                    ConfigRunModuleTableData item = getTableView().getItems().get(getIndex());
+                    createFormAddNewOrEdit(item);
                 });
-
                 deleteBtn.setOnAction(e -> {
                     ConfigRunModuleTableData item = getTableView().getItems().get(getIndex());
                     try {
                         boolean isConfirmDelete = AlertUtils.confirm("Xác nhận xóa", "Bạn có chắc muốn xóa module " + item.getModuleName() + " trên interface: " + item.getInterfaceName() + " không?");
-                        if(isConfirmDelete) {
+                        if (isConfirmDelete) {
                             removeConfigFromConfigFile(item.getId());
                             configRunModuleTableDatas.remove(item);
                             filterConfigRunModuleTableDatas.remove(item);
                             AlertUtils.showAlert("Thành công", "Xóa config thành công.", "INFORMATION");
                         }
-                    }
-                    catch (FileException ex) {
-                        AlertUtils.showAlert("Lỗi",  ex.getMessage(), "ERROR");
-                    }
-                    configRunModuleTable.refresh();
+                    } catch (FileException ex) {
+                        AlertUtils.showAlert("Lỗi", ex.getMessage(), "ERROR");
+                    } configRunModuleTable.refresh();
                 });
             }
-
             @Override
             protected void updateItem(Void item, boolean empty) {
                 super.updateItem(item, empty);
-                if (empty) {
-                    setGraphic(null);
-                } else {
-                    setGraphic(btnBox);
-                }
+                setGraphic(empty ? null : btnBox);
             }
+        });
+
+        // ==== Ép cột cuối cùng chiếm hết phần dư ====
+        // Dùng ChangeListener thay vì bind để không đụng tới prefWidth đã có
+        configRunModuleTable.widthProperty().addListener((obs, oldVal, newVal) -> {
+            double used = selectCol.getWidth()
+                    + moduleNameCol.getWidth()
+                    + statusCol.getWidth()
+                    + commandCol.getWidth()
+                    + interfaceNameCol.getWidth();
+            double remaining = newVal.doubleValue() - used - 2; // bớt padding nhỏ
+            if (remaining > 50) actionColumn.setPrefWidth(remaining);
+            else actionColumn.setPrefWidth(50);
         });
     }
 
     protected void setColumnPercentWidth(TableColumn<?, ?> col, double percent) {
         configRunModuleTable.widthProperty().addListener((obs, oldVal, newVal) -> {
-            double tableWidth = newVal.doubleValue();
-
-            // Trừ phần scroll bar và border (tùy hệ điều hành)
-            double adjustedWidth = tableWidth - 18; // 15–20px là giá trị thực tế hợp lý
-
-            // Tính chiều rộng theo phần trăm
-            double colWidth = adjustedWidth * percent / 100.0;
-
+            double colWidth = newVal.doubleValue() * percent / 100.0;
             col.setPrefWidth(colWidth);
         });
     }
@@ -459,6 +430,11 @@ public class ConfigRunModuleScreen extends VBox {
         tfModuleName.textProperty().addListener((obs, o, n) -> filterNode());
         tfModuleName.getStyleClass().add("filter-text-field");
 
+        tfInterfaceName = new TextField();
+        tfInterfaceName.setPromptText("Tìm theo tên interface");
+        tfInterfaceName.textProperty().addListener((obs, o, n) -> filterNode());
+        tfInterfaceName.getStyleClass().add("filter-text-field");
+
         cbStatus = new ComboBox<>();
         cbStatus.setPromptText("Lọc theo trạng thái");
         cbStatus.getItems().addAll("All", "Active", "Inactive");
@@ -530,7 +506,7 @@ public class ConfigRunModuleScreen extends VBox {
                 StringBuilder messageRunModuleError = new StringBuilder();
                 for (ConfigRunModuleTableData item : configRunModuleChecked) {
                     try {
-                        StringBuilder message = startModule(item.getCommand(), item.getModuleName(), item.getInterfaceName(), item.getArgs().getArgsAsString());
+                        StringBuilder message = startModule(item.getCommand(), item.getModuleName(), item.getInterfaceName(), item.getArgsAsString());
                         Platform.runLater(() -> {
                             if(message.isEmpty()) {
                                 item.setStatus("active");
@@ -582,7 +558,7 @@ public class ConfigRunModuleScreen extends VBox {
                                 }
                                 else {
                                     messageRunModuleError.append(messageRunStopModule);
-                                    boolean isModuleRunning = isProcessRunning(item.getCommand(), item.getInterfaceName(), item.getArgs().getArgsAsString());
+                                    boolean isModuleRunning = isProcessRunning(item.getCommand(), item.getInterfaceName(), item.getArgsAsString());
                                     if(!isModuleRunning) {
                                         item.setStatus("inactive");
                                     }
@@ -590,7 +566,7 @@ public class ConfigRunModuleScreen extends VBox {
                             });
                         }
                         catch (Exception ex) {
-                            boolean isModuleRunning = isProcessRunning(item.getCommand(), item.getInterfaceName(), item.getArgs().getArgsAsString());
+                            boolean isModuleRunning = isProcessRunning(item.getCommand(), item.getInterfaceName(), item.getArgsAsString());
                             if(!isModuleRunning) {
                                 item.setStatus("inactive");
                             }
@@ -611,7 +587,7 @@ public class ConfigRunModuleScreen extends VBox {
         HBox.setHgrow(spacer, Priority.ALWAYS);
 
         // Tạo container
-        HBox filterRow = new HBox(tfModuleName, cbStatus, spacer, cbConfigByName,  runAllBtn, stopAllBtn);
+        HBox filterRow = new HBox(tfModuleName, tfInterfaceName, cbStatus, spacer, cbConfigByName,  runAllBtn, stopAllBtn);
         filterRow.getStyleClass().add("filter-row");
         filterRow.setAlignment(Pos.CENTER_LEFT);
         filterRow.setSpacing(5);
@@ -629,13 +605,16 @@ public class ConfigRunModuleScreen extends VBox {
         ObservableList<ConfigRunModuleTableData> filteredData = FXCollections.observableArrayList();
         String nameFilter = NormalizeString.normalizeString(tfModuleName.getText() != null ? tfModuleName.getText().trim().toLowerCase() : "");
         String statusFilter = NormalizeString.normalizeString(cbStatus.getValue() != null && !cbStatus.getValue().equals("All") ? cbStatus.getValue().toLowerCase() : "");
+        String interfaceFilter = NormalizeString.normalizeString(tfInterfaceName.getText() != null ? tfInterfaceName.getText().trim().toLowerCase() : "");
         for (ConfigRunModuleTableData item : configRunModuleTableDatas) {
             boolean match = true;
             String name = NormalizeString.normalizeString(item.getModuleName() != null ? item.getModuleName().toLowerCase() : "");
             String status = NormalizeString.normalizeString(item.getStatus() != null ? item.getStatus().toLowerCase() : "");
+            String interfaceName = NormalizeString.normalizeString(item.getInterfaceName() != null ? item.getInterfaceName().toLowerCase() : "");
 
             if (!nameFilter.isEmpty() && !name.contains(nameFilter)) match = false;
             if (!statusFilter.isEmpty() && !status.equals(statusFilter)) match = false;
+            if(!interfaceFilter.isBlank() && !interfaceName.contains(interfaceFilter)) match = false;
             if (match) filteredData.add(item);
         }
 
@@ -651,16 +630,6 @@ public class ConfigRunModuleScreen extends VBox {
         catch (Exception e) {
             e.printStackTrace();
         }
-    }
-
-    private Button createIconButton(String iconPath, int height, int width) {
-        ImageView icon = new ImageView(ConfigGeneralScreen.class.getResource(iconPath).toExternalForm());
-        icon.setFitHeight(height);
-        icon.setFitWidth(width);
-        Button button = new Button();
-        button.setGraphic(icon);
-        button.setStyle("-fx-background-color: transparent; -fx-cursor: hand;");
-        return button;
     }
 
     private void createFormAddNewOrEdit(ConfigRunModuleTableData item) {
@@ -728,29 +697,16 @@ public class ConfigRunModuleScreen extends VBox {
         * cấu hình đằng trước, cái -q là cấu hình queue size, -l là số thread xử lý kết quả, -o là là thư mục đẩy kết quả ra,
         * nó sẽ phải giống cái -i ở câu lệnh move file, cái -c nó giống như id của cái chạy, mỗi thằng chạy phải có 1 id khác nhau,
         * */
-        List<String> argTypes = Arrays.asList("Queue", "Thread", "Output", "Active Wait", "Mac address", "id", "Cpu Dispatcher",
-                "Cpu Worker", "Cpu Output", "Min output size");
+        // argTypes: được đọc từ file cấu hình
+        JSONObject arguments = FileUtils.readFileArgumentsConfig();
+        List<String> argTypes = Arrays.asList(arguments.keySet().toArray(new String[0]));
         if(item != null) {
             comboBoxByName.get("Module").setValue(item.getModuleName());
             comboBoxByName.get("Interface").setValue(item.getInterfaceName());
             tfCommand.setText(item.getCommand());
 
-            for(Map.Entry<String, String> entry : item.getArgs().getArgsMap().entrySet()) {
-                String argType =
-                        switch (entry.getKey()) {
-                            case "queue" -> "Queue";
-                            case "thread" -> "Thread";
-                            case "output" -> "Output";
-                            case "active wait" -> "Active Wait";
-                            case "mac address" -> "Mac Address";
-                            case "cpu dispatcher" -> "Cpu Dispatcher";
-                            case "cpu worker" -> "Cpu Worker";
-                            case "cpu output" -> "Cpu Output";
-                            case "min output size" -> "Min Output Size";
-                            case "id" -> "ID";
-                            default -> "Unknown";
-                        };
-                addItemArgForm(argsContainer, argTypes, inputArgs, argType, entry.getValue());
+            for(Map.Entry<String, Object> entry : item.getArgsMap().entrySet()) {
+                addItemArgForm(argsContainer, argTypes, inputArgs, entry.getKey(), entry.getValue());
             }
         }
 
@@ -797,7 +753,7 @@ public class ConfigRunModuleScreen extends VBox {
         saveBtn.setOnMouseClicked(e -> {
             try {
                 System.out.println("Start update config");
-                HashMap<String, String> args = new HashMap<>();
+                HashMap<String, Object> args = new HashMap<>();
                 inputArgs.forEach((k, v) -> {
                     System.out.println(k + ": " + v.getText());
                     args.put(k, v.getText());
@@ -825,15 +781,15 @@ public class ConfigRunModuleScreen extends VBox {
                     item.setInterfaceName(interfaceName);
                     item.setStatus(cbStatus.getValue());
                     item.setCommand(tfCommand.getText());
-                    item.getArgs().setArgsMap(args);
-                    for(Map.Entry<String, String> entry : args.entrySet()) {
+                    item.setArgsMap(args);
+                    for(Map.Entry<String, Object> entry : args.entrySet()) {
                         Label arglabel = valueArgsMap.get(entry.getKey());
-                        arglabel.setText(entry.getValue());
+                        arglabel.setText(String.valueOf(entry.getValue()));
                     }
                 }
                 else {
                     ConfigRunModuleTableData configRunModuleTableData = new ConfigRunModuleTableData(moduleName, cbStatus.getValue(), tfCommand.getText(), interfaceName, "");
-                    configRunModuleTableData.getArgs().setArgsMap(args);
+                    configRunModuleTableData.setArgsMap(args);
                     configRunModuleTableData.setId(String.valueOf(System.nanoTime()));
                     configRunModuleTableDatas.add(configRunModuleTableData);
                     filterConfigRunModuleTableDatas.add(configRunModuleTableData);
@@ -896,17 +852,11 @@ public class ConfigRunModuleScreen extends VBox {
     }
 
     private Node createArgsBox(ConfigRunModuleTableData item) {
-        Map<String, String> args = item.getArgs().getArgsMap();
-        args.putIfAbsent("queue", "Unknown");
-        args.putIfAbsent("output", "Unknown");
-        args.putIfAbsent("thread", "Unknown");
-        args.putIfAbsent("active wait", "Unknown");
-        args.putIfAbsent("cpu dispatcher", "Unknown");
-        args.putIfAbsent("mac address", "Unknown");
-        args.putIfAbsent("id", "Unknown");
-        args.putIfAbsent("cpu output", "Unknown");
-        args.putIfAbsent("min output size", "Unknown");
-        args.putIfAbsent("cpu worker", "Unknown");
+        Map<String, Object> args = item.getArgsMap();
+        JSONObject arguments = FileUtils.readFileArgumentsConfig();
+        for(String key : arguments.keySet()) {
+            args.putIfAbsent(key, "Unknown");
+        }
 
         // ====== Label tiêu đề ======
         argTitle = new Label("Các tham số đầu vào của module UNKNOWN với interface UNKNOWN");
@@ -922,7 +872,7 @@ public class ConfigRunModuleScreen extends VBox {
         );
 
         int cols = 3;
-        List<Map.Entry<String, String>> list = new ArrayList<>(args.entrySet());
+        List<Map.Entry<String, Object>> list = new ArrayList<>(args.entrySet());
         int rows = (int) Math.ceil(list.size() / (double) cols);
         rows = Math.max(rows, 1);
 
@@ -946,7 +896,7 @@ public class ConfigRunModuleScreen extends VBox {
         for (int i = 0; i < list.size(); i++) {
             int r = i / cols, c = i % cols;
 
-            Map.Entry<String, String> e = list.get(i);
+            Map.Entry<String, Object> e = list.get(i);
             VBox cell = new VBox(10);
             cell.setAlignment(Pos.CENTER);
 
@@ -967,7 +917,7 @@ public class ConfigRunModuleScreen extends VBox {
                 icon.setFitWidth(30);
                 icon.setFitHeight(30);
             }
-            if (e.getKey().equals("thread") || e.getKey().equals("queue")) {
+            if (e.getKey().equalsIgnoreCase("thread") || e.getKey().equalsIgnoreCase("queue")) {
                 icon.setFitWidth(50);
                 icon.setFitHeight(50);
             }
@@ -1041,7 +991,7 @@ public class ConfigRunModuleScreen extends VBox {
         return scrollPane;
     }
 
-    private void addItemArgForm(VBox argsContainer, List<String> argTypes, Map<String, TextField> inputArgs, String comboBoxVal, String inputVal) {
+    private void addItemArgForm(VBox argsContainer, List<String> argTypes, Map<String, TextField> inputArgs, String comboBoxVal, Object inputVal) {
         ComboBox<String> combo = new ComboBox<>();
         combo.getItems().addAll(argTypes);
         combo.setPromptText("Chọn loại arg");
@@ -1060,7 +1010,7 @@ public class ConfigRunModuleScreen extends VBox {
         input.setPrefHeight(30);
         input.setStyle("-fx-font-size: 14px;");
         if(inputVal != null) {
-            input.setText(inputVal);
+            input.setText(String.valueOf(inputVal));
         }
 
         // Button xóa
@@ -1071,10 +1021,10 @@ public class ConfigRunModuleScreen extends VBox {
         removeBtn.setPrefHeight(30);
         removeBtn.setStyle(
                 "-fx-background-color: transparent;" +
-                "-fx-border-color: transparent;" +
-                "-fx-padding: 0;" +
-                "-fx-focus-color: transparent;" +
-                "-fx-faint-focus-color: transparent;"
+                        "-fx-border-color: transparent;" +
+                        "-fx-padding: 0;" +
+                        "-fx-focus-color: transparent;" +
+                        "-fx-faint-focus-color: transparent;"
         );
 
         HBox rowBox = new HBox(30, combo, input, removeBtn);
@@ -1099,11 +1049,11 @@ public class ConfigRunModuleScreen extends VBox {
         if(argsContainer.getChildren().isEmpty()) {
             argsContainer.setStyle(
                     "-fx-padding: 10px;" +
-                    "-fx-background-insets: 0;" +
-                    "-fx-background-color: #ffffff;" +
-                    "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.2), 12, 0.1, 0, 2);" +
-                    "-fx-border-radius: 5;" +
-                    "-fx-background-radius: 5;"
+                            "-fx-background-insets: 0;" +
+                            "-fx-background-color: #ffffff;" +
+                            "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.2), 12, 0.1, 0, 2);" +
+                            "-fx-border-radius: 5;" +
+                            "-fx-background-radius: 5;"
             );
         }
         if(combo.getValue() != null) {
@@ -1122,7 +1072,7 @@ public class ConfigRunModuleScreen extends VBox {
                 jsonObject.put("status", moduleConfig.getStatus());
                 jsonObject.put("command", moduleConfig.getCommand());
                 jsonObject.put("interface_name", moduleConfig.getInterfaceName());
-                jsonObject.put("args", moduleConfig.getArgs().getArgsMap());
+                jsonObject.put("args", moduleConfig.getArgsAsString());
                 root.put(moduleConfig.getId() == null ? String.valueOf(System.nanoTime()) : moduleConfig.getId(), jsonObject);
             }
             FileWriter fileWriter = new FileWriter(filePath, StandardCharsets.UTF_8);
@@ -1163,7 +1113,9 @@ public class ConfigRunModuleScreen extends VBox {
         try {
             // " -i zc:" + interfaceName + " " + args + "
             String[] parts = item.getCommand().split(";");
-            String[] cmd = {"pkill", "-f", (parts.length >= 2 ? item.getCommand() : parts[1]) + " -i zc:" + item.getInterfaceName() + " " + item.getArgs().getArgsAsString()};
+            System.out.println(parts.length);
+            String command = (parts.length < 2 ? item.getCommand() : parts[1]) + " -i zc:" + item.getInterfaceName() + " " + item.getArgsAsString();
+            String[] cmd = {"bash", "-c", "pkill -f \"" + command + "\""};
             logger.info("Stop module: {}", Arrays.toString(cmd));
             System.out.println("Kill process: " + Arrays.toString(cmd));
             Process p = Runtime.getRuntime().exec(cmd);
@@ -1223,20 +1175,10 @@ public class ConfigRunModuleScreen extends VBox {
                         ""
                 );
 
-                JSONObject argJson = (JSONObject) configModule.get("args");
-                ArgumentsTableData arg = new ArgumentsTableData(
-                        !argJson.has("queue") ? "Unknown" : argJson.getString("queue"),
-                        !argJson.has("cpu worker") ? "Unknown" : argJson.getString("cpu worker"),
-                        !argJson.has("output") ? "Unknown" : argJson.getString("output"),
-                        !argJson.has("thread") ? "Unknown" : argJson.getString("thread"),
-                        !argJson.has("active wait") ? "Unknown" : argJson.getString("active wait"),
-                        !argJson.has("cpu dispatcher") ? "Unknown" : argJson.getString("cpu dispatcher"),
-                        !argJson.has("cpu output") ? "Unknown" : argJson.getString("cpu output"),
-                        !argJson.has("mac address") ? "Unknown" : argJson.getString("mac address"),
-                        !argJson.has("id") ? "Unknown" : argJson.getString("id"),
-                        !argJson.has("min output size") ? "Unknown" : argJson.getString("min output size")
-                );
-                moduleConfig.setArgs(arg);
+                // được sử dụng để hiển thị
+                String argStr = configModule.getString("args"); // có dạng: -a -g 1:2:3 ...
+                HashMap<String, Object> argumentsMap = parseFlags(argStr);
+                moduleConfig.setArgsMap(argumentsMap);
                 moduleConfig.setId(key);
                 configRunModuleTableData.add(moduleConfig);
             }
@@ -1274,7 +1216,7 @@ public class ConfigRunModuleScreen extends VBox {
         }
         return false;
     }
-    private void updateConfig(String path, String moduleName, String status, String command, String interfaceName, HashMap<String, String> args, String configId) {
+    private void updateConfig(String path, String moduleName, String status, String command, String interfaceName, HashMap<String, Object> args, String configId) {
         try {
             Path filePath = Paths.get(path);
             if (Files.notExists(filePath)) {
@@ -1626,5 +1568,39 @@ public class ConfigRunModuleScreen extends VBox {
             e.printStackTrace();
         }
         return new StringBuilder();
+    }
+
+    public static HashMap<String, Object> parseFlags(String input) {
+        // đọc file arg: key là các cờ
+        JSONObject arguments = FileUtils.readFileArgumentsConfigWithKeyIsFlags();
+        System.out.println(arguments);
+        HashMap<String, Object> map = new LinkedHashMap<>();
+        String[] tokens = input.trim().split("\\s+");
+        String currentFlag = null;
+        for (int i = 0; i < tokens.length; i++) {
+            String token = tokens[i];
+            if (token.startsWith("-")) {
+                if (currentFlag != null && !map.containsKey(currentFlag)) {
+                    JSONObject argument = arguments.getJSONObject(currentFlag);
+                    map.put(argument.getString("display_name"), currentFlag.equalsIgnoreCase("-a") ? "true" : currentFlag);
+                }
+                currentFlag = token;
+                if (i == tokens.length - 1) {
+                    JSONObject argument = arguments.getJSONObject(currentFlag);
+                    map.put(argument.getString("display_name"), currentFlag.equalsIgnoreCase("-a") ? "true" : currentFlag);
+                }
+            } else {
+                if (currentFlag != null) {
+                    JSONObject argument = arguments.getJSONObject(currentFlag);
+                    map.put(argument.getString("display_name"), token);
+                    currentFlag = null;
+                }
+            }
+        }
+        if (currentFlag != null && !map.containsKey(currentFlag)) {
+            JSONObject argument = arguments.getJSONObject(currentFlag);
+            map.put(argument.getString("display_name"), currentFlag.equalsIgnoreCase("-a") ? "true" : currentFlag);
+        }
+        return map;
     }
 }

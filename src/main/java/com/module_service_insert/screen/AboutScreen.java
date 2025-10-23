@@ -3,6 +3,7 @@ package com.module_service_insert.screen;
 import com.module_service_insert.constant.VariableCommon;
 import com.module_service_insert.utils.functionUtils.AlertUtils;
 import com.module_service_insert.utils.screenUtils.AddCssForBtnUtil;
+import com.module_service_insert.utils.screenUtils.ButtonUtil;
 import javafx.application.Platform;
 import javafx.concurrent.Task;
 import javafx.geometry.HPos;
@@ -147,14 +148,16 @@ public class AboutScreen extends StackPane {
         importIcon.setFitWidth(16);
 
 
-        Button btnCheck = new Button("Check license", checkIcon);
-        Button btnImport = new Button("Load license", importIcon);
+//        Button btnCheck = new Button("Check license", checkIcon);
+        Button btnCheck = ButtonUtil.createBtn("Check license", "/com/module_service_insert/icons/check.png");
+//        Button btnImport = new Button("Load license", importIcon);
+        Button btnImport = ButtonUtil.createBtn("Load license", "/com/module_service_insert/icons/import.png");
         AddCssForBtnUtil.addCssStyleForBtn(btnCheck);
         AddCssForBtnUtil.addCssStyleForBtn(btnImport);
-        btnCheck.setMinWidth(Region.USE_PREF_SIZE);
-        btnImport.setMinWidth(Region.USE_PREF_SIZE);
-        btnCheck.setMaxWidth(Region.USE_PREF_SIZE);
-        btnImport.setMaxWidth(Region.USE_PREF_SIZE);
+//        btnCheck.setMinWidth(Region.USE_PREF_SIZE);
+//        btnImport.setMinWidth(Region.USE_PREF_SIZE);
+//        btnCheck.setMaxWidth(Region.USE_PREF_SIZE);
+//        btnImport.setMaxWidth(Region.USE_PREF_SIZE);
 
         Region spacer = new Region();
         HBox.setHgrow(spacer, Priority.ALWAYS);

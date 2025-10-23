@@ -32,7 +32,7 @@ public class ModuleInsertApplication extends Application {
             ScreenNavigator.navigateTo(managerNodeAndModuleScreen);
         });
 
-        Scene scene = new Scene(root, 1140, 800);
+        Scene scene = new Scene(root, 1300, 900);
         stage.setTitle("Ứng dụng quản lý module");
         stage.setScene(scene);
         stage.setResizable(false);
@@ -50,8 +50,6 @@ public class ModuleInsertApplication extends Application {
                 VariableCommon.CONFIG_PATH = args[i + 1];
             }
         }
-//        VariableCommon.LICENSE_CHECK_MODULE_PATH = "D:\\license";
-//        VariableCommon.LICENSE_CHECK_MODULE_NAME = "python -u D:\\license\\check_license.py ";
         ScheduledExecutorService schedule = Executors.newScheduledThreadPool(1);
         schedule.scheduleAtFixedRate(() -> {
             File configFile = new File(VariableCommon.CONFIG_PATH);
@@ -92,6 +90,11 @@ public class ModuleInsertApplication extends Application {
                         if(line.startsWith("module_name_path")) {
                             if(VariableCommon.MODULE_NAME_PATH == null || !VariableCommon.MODULE_NAME_PATH.equalsIgnoreCase(parts[1])) {
                                 VariableCommon.MODULE_NAME_PATH = parts[1];
+                            }
+                        }
+                        if(line.startsWith("argument_file_path")) {
+                            if(VariableCommon.ARGUMENTS_FILE_PATH == null || !VariableCommon.ARGUMENTS_FILE_PATH.equalsIgnoreCase(parts[1])) {
+                                VariableCommon.ARGUMENTS_FILE_PATH = parts[1];
                             }
                         }
                     }

@@ -60,61 +60,48 @@ public class ArgumentsTableData {
     public String getThread() {return this.thread.get();}
     public String getativeWait() {return this.ativeWait.get();}
     public void setArgsMap(Map<String, String> argsMap) {this.argsMap.putAll(argsMap);}
+
     // -q queue, -g cpu binding, -o output, -l thread, -a ative wait
-    public String getArgsAsString() {
-//        System.out.println("========== DEBUG ARG VALUES ==========");
+//    public String getArgsAsString() {
+//        Map<String, String> args = new LinkedHashMap<>();
+//        args.put("-q", queue.get() != null ? queue.get() : this.argsMap.getOrDefault("queue", "unknown"));
+//        args.put("-g", cpuBinding.get() != null ? cpuBinding.get() : this.argsMap.getOrDefault("cpu worker", "unknown"));
+//        args.put("-o", output.get() != null ? output.get() : this.argsMap.getOrDefault("output", "unknown"));
+//        args.put("-l", thread.get() != null ? thread.get() : this.argsMap.getOrDefault("thread", "unknown"));
+//        args.put("-a", ativeWait.get() != null ? ativeWait.get() : this.argsMap.getOrDefault("active wait", "unknown"));
+//        args.put("-b", macAddress.get() != null ? macAddress.get() : this.argsMap.getOrDefault("mac address", "unknown"));
+//        args.put("-c", id.get() != null ? id.get() : this.argsMap.getOrDefault("id", "unknown"));
+//        args.put("-t", minOutputSize.get() != null ? minOutputSize.get() : this.argsMap.getOrDefault("min output size", "unknown"));
+//        args.put("-r", cpuDispatch.get() != null ? cpuDispatch.get() : this.argsMap.getOrDefault("cpu dispatcher", "unknown"));
+//        args.put("-j", cpuOutput.get() != null ? cpuOutput.get() : this.argsMap.getOrDefault("cpu output", "unknown"));
 //
-//        printDebug("-q", "queue", queue.get(), this.argsMap.get("queue"));
-//        printDebug("-g", "cpuBinding", cpuBinding.get(), this.argsMap.get("cpu worker"));
-//        printDebug("-o", "output", output.get(), this.argsMap.get("output"));
-//        printDebug("-l", "thread", thread.get(), this.argsMap.get("thread"));
-//        printDebug("-a", "activeWait", ativeWait.get(), this.argsMap.get("active wait"));
-//        printDebug("-b", "macAddress", macAddress.get(), this.argsMap.get("mac address"));
-//        printDebug("-c", "id", id.get(), this.argsMap.get("id"));
-//        printDebug("-t", "minOutputSize", minOutputSize.get(), this.argsMap.get("min output size"));
-//        printDebug("-r", "cpuDispatch", cpuDispatch.get(), this.argsMap.get("cpu dispatcher"));
-//        printDebug("-j", "cpuOutput", cpuOutput.get(), this.argsMap.get("cpu output"));
+//        String cmd = args.entrySet().stream()
+//                .filter(e -> e.getValue() != null && !"unknown".equalsIgnoreCase(e.getValue()))
+//                .map(e -> String.format("%s %s", e.getKey(), e.getValue()))
+//                .collect(Collectors.joining(" "));
 //
-//        System.out.println("======================================");
-        Map<String, String> args = Map.of(
-                "-q", queue.get() != null ? queue.get() : this.argsMap.get("queue") != null ? this.argsMap.get("queue") : "unknown",
-                "-g", cpuBinding.get() != null ? cpuBinding.get() : this.argsMap.get("cpu worker") != null ? this.argsMap.get("cpu worker") : "unknown",
-                "-o", output.get() != null ? output.get() : this.argsMap.get("output") != null ? this.argsMap.get("output") : "unknown",
-                "-l", thread.get() != null ? thread.get() : this.argsMap.get("thread") != null ? this.argsMap.get("thread") : "unknown",
-                "-a", ativeWait.get() != null ? ativeWait.get() : this.argsMap.get("active wait") != null ? this.argsMap.get("active wait") : "unknown",
-                "-b", macAddress.get() !=  null ? macAddress.get() : this.argsMap.get("mac address") != null ? this.argsMap.get("mac address") : "unknown",
-                "-c", id.get() != null ? id.get() : this.argsMap.get("id") != null ? this.argsMap.get("id") : "unknown",
-                "-t", minOutputSize.get() !=  null ? minOutputSize.get() : this.argsMap.get("min output size") != null ? this.argsMap.get("min output size") : "unknown",
-                "-r", cpuDispatch.get() !=  null ? cpuDispatch.get() : this.argsMap.get("cpu dispatcher") != null ? this.argsMap.get("cpu dispatcher") : "unknown",
-                "-j", cpuOutput.get() != null ? cpuOutput.get() : this.argsMap.get("cpu output") != null ? this.argsMap.get("cpu output") : "unknown"
-        );
-
-        String cmd = args.entrySet().stream()
-                .filter(e -> e.getValue() != null && !e.getValue().equalsIgnoreCase("unknown"))
-                .map(e -> String.format("%s %s", e.getKey(), e.getValue()))
-                .collect(Collectors.joining(" "));
-
-        return cmd;
-    }
-
-    public Map<String, String> getArgsMap() {
-        if (this.argsMap.isEmpty()) {
-            Map<String, String> map = new LinkedHashMap<>();
-            addIfValid(map, "queue", queue.get());
-            addIfValid(map, "cpu worker", cpuBinding.get());
-            addIfValid(map, "output", output.get());
-            addIfValid(map, "thread", thread.get());
-            addIfValid(map, "active wait", ativeWait.get());
-            addIfValid(map, "cpu dispatcher", cpuDispatch.get()); // cpu dispatcher
-            addIfValid(map, "mac address", macAddress.get());
-            addIfValid(map, "id", id.get());
-            addIfValid(map, "cpu output", cpuOutput.get());
-            addIfValid(map, "min output size", minOutputSize.get());
-            return map;
-        }
-        return this.argsMap;
-
-    }
+//        return cmd;
+//    }
+//
+//    // Map này được sử dụng để hiển thị
+//    public Map<String, String> getArgsMap() {
+//        if (this.argsMap.isEmpty()) {
+//            Map<String, String> map = new LinkedHashMap<>();
+//            addIfValid(map, "-q", queue.get());
+//            addIfValid(map, "-g", cpuBinding.get());
+//            addIfValid(map, "-o", output.get());
+//            addIfValid(map, "-l", thread.get());
+//            addIfValid(map, "-a", ativeWait.get());
+//            addIfValid(map, "-r", cpuDispatch.get());
+//            addIfValid(map, "-b", macAddress.get());
+//            addIfValid(map, "-c", id.get());
+//            addIfValid(map, "-j", cpuOutput.get());
+//            addIfValid(map, "-t", minOutputSize.get());
+//            return map;
+//        }
+//        return this.argsMap;
+//
+//    }
 
     private void addIfValid(Map<String, String> map, String key, String value) {
         if (value != null && !value.trim().isEmpty()) {

@@ -13,6 +13,7 @@ module com.manager.stock.module_service_insert {
     requires poi.scratchpad;
     requires sesame.util;
     requires netcdf;
+    requires java.desktop;
 
     opens com.module_service_insert to javafx.fxml;
     exports com.module_service_insert;

@@ -16,4 +16,6 @@ public class VariableCommon {
     public static String ACTIVE_CONFIG_DIRECTORY_PATH = null;
     public static String LOG_FOLDER = null;
     public static String MODULE_NAME_PATH = null;
+    public static Long LAST_MODIFIED_TIME_ARGUMENT_CONFIG = null;
+    public static String ARGUMENTS_FILE_PATH = null;
 }
