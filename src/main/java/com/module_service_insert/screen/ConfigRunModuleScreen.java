@@ -5,9 +5,7 @@ import com.module_service_insert.constant.VariableCommon;
 import com.module_service_insert.exception.FileException;
 import com.module_service_insert.exception.RunException;
 import com.module_service_insert.model.ConfigModel;
-import com.module_service_insert.model.tableData.ArgumentsTableData;
 import com.module_service_insert.model.tableData.ConfigRunModuleTableData;
-import com.module_service_insert.presenter.ConfigPresenter;
 import com.module_service_insert.utils.functionUtils.AlertUtils;
 import com.module_service_insert.utils.functionUtils.ChooseLocationFile;
 import com.module_service_insert.utils.functionUtils.FileUtils;
@@ -40,7 +38,6 @@ import org.slf4j.LoggerFactory;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
-import java.sql.Time;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
@@ -79,7 +76,10 @@ public class ConfigRunModuleScreen extends VBox {
     private Label argTitle;
     private final HashMap<String, ComboBox<String>> comboBoxByName = new HashMap<>();
     private final List<ConfigRunModuleTableData> configRunModuleChecked;
+    private Node argsBox;
     private ScheduledExecutorService scheduler;
+
+    private List<ConfigRunModuleTableData> configRunModuleCheckedToRunLastTime;
 
     // biến lưu các biến thể của interface
     private Map<String, List<String>> interfaceByRss = new HashMap<>();
@@ -89,6 +89,7 @@ public class ConfigRunModuleScreen extends VBox {
     public ConfigRunModuleScreen(String name) {
         configName = name;
         configRunModuleChecked = new ArrayList<>();
+        configRunModuleCheckedToRunLastTime = new ArrayList<>();
         setSpacing(15);
         setStyle("-fx-padding: 5 15 15 15; -fx-background-insets: 0; -fx-background-color: #f3f3f3");
 
@@ -116,7 +117,7 @@ public class ConfigRunModuleScreen extends VBox {
             -fx-border-width: 0;
             -fx-divider-width: 1;
         """);
-        Node argsBox = createArgsBox(new ConfigRunModuleTableData());
+        argsBox = createArgsBox(new ConfigRunModuleTableData());
         getChildren().addAll(topBar, splitPane, argsBox);
 
         overLay = new StackPane(new ProgressIndicator());
@@ -196,8 +197,17 @@ public class ConfigRunModuleScreen extends VBox {
         selectAllCheckBox.selectedProperty().addListener((obs, oldVal, newVal) -> {
             for (ConfigRunModuleTableData item : configRunModuleTable.getItems()) {
                 item.setSelected(newVal);
-                if (newVal) configRunModuleChecked.add(item);
-                else configRunModuleChecked.remove(item);
+                if (newVal) {
+                    if(item.getInterfaceName().endsWith("@0")) {
+                        configRunModuleCheckedToRunLastTime.add(item);
+                        continue;
+                    }
+                    configRunModuleChecked.add(item);
+                }
+                else {
+                    configRunModuleChecked.remove(item);
+                    configRunModuleCheckedToRunLastTime.remove(item);
+                }
             }
         });
 
@@ -382,7 +392,12 @@ public class ConfigRunModuleScreen extends VBox {
 
             @Override
             public void onReload() {
-
+                ScreenNavigator.showLoading();
+                Platform.runLater(() -> {
+                    ConfigRunModuleScreen s = new ConfigRunModuleScreen(null);
+                    s.showTable();
+                    ScreenNavigator.navigateTo(s);
+                });
             }
 
             @Override
@@ -419,6 +434,7 @@ public class ConfigRunModuleScreen extends VBox {
                 File selectedFile = fileChooser.showOpenDialog(owner);
                 if(selectedFile != null) {
                     readFileConfig(selectedFile.toPath());
+                    copyFile(selectedFile.toPath());
                 }
             }
         };
@@ -505,6 +521,28 @@ public class ConfigRunModuleScreen extends VBox {
             CompletableFuture.supplyAsync(() -> {
                 StringBuilder messageRunModuleError = new StringBuilder();
                 for (ConfigRunModuleTableData item : configRunModuleChecked) {
+                    try {
+                        StringBuilder message = startModule(item.getCommand(), item.getModuleName(), item.getInterfaceName(), item.getArgsAsString());
+                        Platform.runLater(() -> {
+                            if(message.isEmpty()) {
+                                item.setStatus("active");
+                            }
+                            else {
+                                messageRunModuleError.append(message).append("\n");
+                                item.setStatus("error");
+                            }
+                        });
+                    }
+                    catch (Exception ex) {
+                        Platform.runLater(() -> {
+                            item.setStatus("error");
+                        });
+                        ex.printStackTrace();
+                    }
+                }
+
+                // chạy các interface @0 cuối cùng
+                for (ConfigRunModuleTableData item : configRunModuleCheckedToRunLastTime) {
                     try {
                         StringBuilder message = startModule(item.getCommand(), item.getModuleName(), item.getInterfaceName(), item.getArgsAsString());
                         Platform.runLater(() -> {
@@ -749,15 +787,37 @@ public class ConfigRunModuleScreen extends VBox {
         bottomRow.setAlignment(Pos.CENTER_RIGHT);
 
         cancelBtn.setOnMouseClicked(e -> dialogStage.close());
-
+        System.out.println("chỉnh sửa module có id: " + (item != null ? item.getId() : "Thêm mới"));
         saveBtn.setOnMouseClicked(e -> {
             try {
                 System.out.println("Start update config");
                 HashMap<String, Object> args = new HashMap<>();
-                inputArgs.forEach((k, v) -> {
+                for (Map.Entry<String, TextField> entry : inputArgs.entrySet()) {
+                    String k = entry.getKey();
+                    TextField v = entry.getValue();
                     System.out.println(k + ": " + v.getText());
+                    JSONObject arg = arguments.getJSONObject(k);
+                    String argVal = v.getText();
+                    String dataTypeOfArg = arg.getString("data_type");
+                    try {
+                        if (dataTypeOfArg.equalsIgnoreCase("number")) {
+                            System.out.println(k + "->" + dataTypeOfArg);
+                            double val = Double.parseDouble(argVal.trim());
+                        }
+                        else if(dataTypeOfArg.equalsIgnoreCase("boolean")) {
+                            if(!argVal.toLowerCase().trim().equalsIgnoreCase("true") && !argVal.toLowerCase().trim().equalsIgnoreCase("false")) {
+                                AlertUtils.showAlert("Lỗi", k + " có kiểu dữ liệu là: " + dataTypeOfArg + ", vui lòng nhập đúng định dạng.", "ERROR");
+                                return;
+                            }
+                        }
+                    }
+                    catch (Exception ex) {
+                        ex.printStackTrace();
+                        AlertUtils.showAlert("Lỗi", k + " có kiểu dữ liệu là: " + dataTypeOfArg + ", vui lòng nhập đúng định dạng.", "ERROR");
+                        return;
+                    }
                     args.put(k, v.getText());
-                });
+                };
                 String interfaceName = comboBoxByName.get("Interface").getValue();
                 String moduleName = comboBoxByName.get("Module").getValue();
                 if(interfaceName == null || moduleName == null) {
@@ -765,14 +825,15 @@ public class ConfigRunModuleScreen extends VBox {
                     return;
                 }
                 // đang chọn file cấu hình để hiển thị
+                String configId;
                 if(cbConfigByName.getValue() != null) {
                     System.out.println("Cập nhật cấu hình đang chọn.");
-                    updateConfig(cbConfigByName.getValue().getPath(),  moduleName,
+                    configId = updateConfig(cbConfigByName.getValue().getPath(),  moduleName,
                             cbStatus.getValue(), tfCommand.getText(), interfaceName, args,
-                            item.getId());
+                            item != null ? item.getId() : null);
                 }
                 String path = VariableCommon.ACTIVE_CONFIG_DIRECTORY_PATH + "active_config_file.json";
-                updateConfig(path, moduleName,
+                configId = updateConfig(path, moduleName,
                         cbStatus.getValue(), tfCommand.getText(), interfaceName, args,
                         item != null ? item.getId() : null);
                 AlertUtils.showAlert("Thành công", "Cập nhật cấu hình thành công.", "INFORMATION");
@@ -790,7 +851,7 @@ public class ConfigRunModuleScreen extends VBox {
                 else {
                     ConfigRunModuleTableData configRunModuleTableData = new ConfigRunModuleTableData(moduleName, cbStatus.getValue(), tfCommand.getText(), interfaceName, "");
                     configRunModuleTableData.setArgsMap(args);
-                    configRunModuleTableData.setId(String.valueOf(System.nanoTime()));
+                    configRunModuleTableData.setId(configId);
                     configRunModuleTableDatas.add(configRunModuleTableData);
                     filterConfigRunModuleTableDatas.add(configRunModuleTableData);
                 }
@@ -857,6 +918,7 @@ public class ConfigRunModuleScreen extends VBox {
         for(String key : arguments.keySet()) {
             args.putIfAbsent(key, "Unknown");
         }
+        System.out.println(args);
 
         // ====== Label tiêu đề ======
         argTitle = new Label("Các tham số đầu vào của module UNKNOWN với interface UNKNOWN");
@@ -1021,10 +1083,10 @@ public class ConfigRunModuleScreen extends VBox {
         removeBtn.setPrefHeight(30);
         removeBtn.setStyle(
                 "-fx-background-color: transparent;" +
-                        "-fx-border-color: transparent;" +
-                        "-fx-padding: 0;" +
-                        "-fx-focus-color: transparent;" +
-                        "-fx-faint-focus-color: transparent;"
+                "-fx-border-color: transparent;" +
+                "-fx-padding: 0;" +
+                "-fx-focus-color: transparent;" +
+                "-fx-faint-focus-color: transparent;"
         );
 
         HBox rowBox = new HBox(30, combo, input, removeBtn);
@@ -1032,6 +1094,10 @@ public class ConfigRunModuleScreen extends VBox {
         removeBtn.setOnAction(ev -> {
             argsContainer.getChildren().remove(rowBox);
             inputArgs.remove(combo.getValue() != null ? combo.getValue().toLowerCase() : null);
+            Label argVal = valueArgsMap.get(combo.getValue() != null ? combo.getValue().toLowerCase() : null);
+            if(argVal != null) {
+                argVal.setText("Unknown");
+            }
             if(argsContainer.getChildren().isEmpty()) {
                 argsContainer.setStyle("");
             }
@@ -1049,11 +1115,11 @@ public class ConfigRunModuleScreen extends VBox {
         if(argsContainer.getChildren().isEmpty()) {
             argsContainer.setStyle(
                     "-fx-padding: 10px;" +
-                            "-fx-background-insets: 0;" +
-                            "-fx-background-color: #ffffff;" +
-                            "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.2), 12, 0.1, 0, 2);" +
-                            "-fx-border-radius: 5;" +
-                            "-fx-background-radius: 5;"
+                    "-fx-background-insets: 0;" +
+                    "-fx-background-color: #ffffff;" +
+                    "-fx-effect: dropshadow(gaussian, rgba(0,0,0,0.2), 12, 0.1, 0, 2);" +
+                    "-fx-border-radius: 5;" +
+                    "-fx-background-radius: 5;"
             );
         }
         if(combo.getValue() != null) {
@@ -1075,8 +1141,10 @@ public class ConfigRunModuleScreen extends VBox {
                 jsonObject.put("args", moduleConfig.getArgsAsString());
                 root.put(moduleConfig.getId() == null ? String.valueOf(System.nanoTime()) : moduleConfig.getId(), jsonObject);
             }
+            String formatted = root.toString(4)
+                    .replace("\t", "    ");
             FileWriter fileWriter = new FileWriter(filePath, StandardCharsets.UTF_8);
-            fileWriter.write(root.toString());
+            fileWriter.write(formatted);
             fileWriter.close();
         }
         catch (Exception e) {
@@ -1180,6 +1248,7 @@ public class ConfigRunModuleScreen extends VBox {
                 HashMap<String, Object> argumentsMap = parseFlags(argStr);
                 moduleConfig.setArgsMap(argumentsMap);
                 moduleConfig.setId(key);
+                System.out.println("Module id " + moduleConfig.getId());
                 configRunModuleTableData.add(moduleConfig);
             }
             configRunModuleTableDatas.setAll(configRunModuleTableData);
@@ -1216,7 +1285,7 @@ public class ConfigRunModuleScreen extends VBox {
         }
         return false;
     }
-    private void updateConfig(String path, String moduleName, String status, String command, String interfaceName, HashMap<String, Object> args, String configId) {
+    private String updateConfig(String path, String moduleName, String status, String command, String interfaceName, HashMap<String, Object> args, String configId) {
         try {
             Path filePath = Paths.get(path);
             if (Files.notExists(filePath)) {
@@ -1227,6 +1296,12 @@ public class ConfigRunModuleScreen extends VBox {
                     writer.write("{}");
                 }
             }
+            JSONObject arguments = FileUtils.readFileArgumentsConfig();
+            String argumentsStr = args.entrySet().
+                    stream()
+                    .map(e -> arguments.getJSONObject(e.getKey()).getString("command_name") + " " + e.getValue())
+                    .collect(Collectors.joining(" "));
+            System.out.println("module id: " + configId);
             String content = new String(Files.readAllBytes(filePath));
             JSONObject root = new JSONObject(content);
             JSONObject jsonObject = new JSONObject();
@@ -1234,13 +1309,15 @@ public class ConfigRunModuleScreen extends VBox {
             jsonObject.put("status", status);
             jsonObject.put("command", command);
             jsonObject.put("interface_name", interfaceName);
-            jsonObject.put("args", args);
-            System.out.println(args);
-            root.put(configId == null ? String.valueOf(System.nanoTime()) : configId, jsonObject);
+            jsonObject.put("args", argumentsStr);
+            System.out.println(argumentsStr);
+            String id = configId == null ? String.valueOf(System.nanoTime()) : configId;
+            root.put(id, jsonObject);
             FileWriter fileWriter = new FileWriter(path.toString(), StandardCharsets.UTF_8);
             fileWriter.write(root.toString());
             fileWriter.flush();
             fileWriter.close();
+            return id;
         }
         catch (NoSuchFileException e) {
             logger.error("update config error, details: ", e);
@@ -1423,32 +1500,16 @@ public class ConfigRunModuleScreen extends VBox {
                     })
                     .filter(entry -> entry.getValue() != null)
                     .collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue().lastModified()));
-            for(ConfigRunModuleTableData configRunModuleTableData : configRunModuleTableDatas) {
+            for(ConfigRunModuleTableData configRunModuleTableData : filterConfigRunModuleTableDatas) {
                 String interfaceName = configRunModuleTableData.getInterfaceName();
                 // TH không có log file và status là active ==> báo lỗi
                 Platform.runLater(() -> {
-                    // && configRunModuleTableData.getStatus().equals("active")
-//                    if(!lastModifiedFiles.containsKey(interfaceName)) {
-//                        StringBuilder isModuleRunning = isRunningSuccess(configRunModuleTableData.getInterfaceName(), configRunModuleTableData.getModuleName());
-//                        System.out.println("Check status: " + configRunModuleTableData.getCommand());
-//                        // check log ==> không có log
-//                        if(!isModuleRunning.isEmpty()) {
-//                            configRunModuleTableData.setStatus("error");
-//                            configRunModuleTableData.setIsUpdate(true);
-//                            logger.debug("Module: {} đang chạy nhưng không có log file.", configRunModuleTableData.getModuleName());
-//                        }
-//                        // TH không có log và module đang không chạy
-//                        else if(!configRunModuleTableData.getStatus().equals("inactive")){
-//                            configRunModuleTableData.setStatus("inactive");
-//                            configRunModuleTableData.setIsUpdate(true);
-//                        }
-//                    }
-//                    else {
                     if(lastModifiedFiles.containsKey(interfaceName)) {
                         long lastModifiedFile = lastModifiedFiles.get(interfaceName);
                         long currentTime = System.currentTimeMillis();
                         // check trong 2 chu kì không thấy có log ==> cần check lại xem có đang chạy hay không
                         if(Math.abs(lastModifiedFile - currentTime) > 10000) {
+                            // check log hệ thống xem có lỗi gì không
                             StringBuilder isModuleRunning = isRunningSuccess(configRunModuleTableData.getInterfaceName(), configRunModuleTableData.getModuleName());
                             // Sau 2 chu kì không có log, nhưng module vẫn đang chạy
                             if(!isModuleRunning.isEmpty()) {
@@ -1466,11 +1527,17 @@ public class ConfigRunModuleScreen extends VBox {
                             configRunModuleTableData.setIsUpdate(true);
                         }
                     }
-
-//                    }
+                    else {
+                        boolean isRunning = isProcessRunning(configRunModuleTableData.getCommand(), configRunModuleTableData.getInterfaceName(), configRunModuleTableData.getArgsAsString());
+                        if(!configRunModuleTableData.getStatus().equalsIgnoreCase("inactive") && !isRunning) {
+                            configRunModuleTableData.setStatus("inactive");
+                            configRunModuleTableData.setIsUpdate(true);
+                        }
+                    }
                 });
             }
             updateStatusModuleRun(configRunModuleTableDatas);
+            configRunModuleTable.refresh();
         }, 0, 5, TimeUnit.SECONDS);
     }
     public void setScheduler(ScheduledExecutorService scheduler) {
